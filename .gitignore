@@ -73,3 +73,11 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Custom ignored files
+ios/genesis 3.txn
+*.txn
+
+# Environments (보안 필수)
+.env
+.env.*

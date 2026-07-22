@@ -11,7 +11,7 @@ function HomeScreen({}: HomeScreenProps) {
     <View style={styles.container}>
       <Text style={styles.title}>Home Screen</Text>
       <Button
-        title="프로필 화면으로 이동하기"
+        title="프로필 페이지"
         onPress={() => navigation.navigate('Profile')}
       />
     </View>

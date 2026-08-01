@@ -1,21 +1,18 @@
-import nacl, {verify} from 'tweetnacl';
+import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import {
   PoolCreate,
   NymRequest,
-  NymRequestOptions,
-  GetNymRequest,
+  AttribRequest,
 } from '@hyperledger/indy-vdr-react-native';
 import 'fast-text-encoding';
 import RNFS from 'react-native-fs';
 import {Buffer} from 'buffer';
 import {DID_PRIVATEKEY_FOR_REGISTER} from '@env';
 import 'react-native-get-random-values';
-import {AttribRequest} from '@hyperledger/indy-vdr-react-native';
 import {Platform} from 'react-native';
 
-// 25.03.18 추가
-// Ed25519, x25519 키 쌍 생성 및 DID 생성
+// Ed25519, X25519 키 쌍 생성 및 DID 생성
 export async function generateSeparateKeyPairs() {
   // ✅ Ed25519 키 쌍 생성 (DID 및 서명용)
   const ed25519KeyPair = nacl.sign.keyPair();
@@ -47,34 +44,28 @@ export async function generateSeparateKeyPairs() {
   };
 }
 
-// 환경변수 unit8array로 디코딩 하기 위한 함수
+// 환경변수 Uint8Array 디코딩 헬퍼 함수
 function decodeBase64ToUint8Array(base64String: string): Uint8Array {
   return new Uint8Array(Buffer.from(base64String, 'base64'));
 }
 
+// NYM 트랜잭션 제출 함수 (외부에서 생성한 pool 인스턴스를 받아서 처리)
 export async function registerDID(
+  pool: PoolCreate,
   subDid: string,
   targetDid: string,
   publicKey: string,
 ) {
-  console.log(DID_PRIVATEKEY_FOR_REGISTER);
-  const pool = await setupIndyPool();
   try {
-    // ✅ DID에서 "did:indy:" 접두사를 제거해야 함
     const submitterDid = subDid;
     const dest = targetDid.replace(/^did:indy:/, '');
     const verkey = publicKey;
-    const alias = 'Holder_test_did_indy_vdr';
-    const role: 'ENDORSER' = 'ENDORSER'; // ✅ 역할을 정확한 타입으로 설정
 
-    // ✅ Indy 원장이 요구하는 JSON 형식으로 NYM 트랜잭션 생성
     const nymTransaction = {
-      submitterDid, // ✅ 트랜잭션을 제출하는 기존 DID (TRUST_ANCHOR 권한 필요)
-      dest, // ✅ 새로 등록할 DID
-      verkey, // ✅ 해당 DID의 Public Key (Base58)
-      // alias,  // ✅ (선택 사항) DID의 별칭
-      // role,  // ✅ 역할을 "ENDORSER"로 설정
-      version: 2, // ✅ 필수 프로토콜 버전 추가
+      submitterDid,
+      dest,
+      verkey,
+      version: 2,
     };
 
     console.log(
@@ -82,94 +73,114 @@ export async function registerDID(
       JSON.stringify(nymTransaction, null, 2),
     );
 
-    // ✅ NymRequest 객체 생성
     const nymRequest = new NymRequest(nymTransaction);
-
     console.log('✅ NYM Request 생성 완료:', nymRequest);
 
     const encoder = new TextEncoder();
     const messageBytes = encoder.encode(nymRequest.signatureInput);
 
-    // const decoded_key = decodeBase64ToUint8Array(DID_PRIVATEKEY_FOR_REGISTER);
     const decoded_key = decodeBase64ToUint8Array(DID_PRIVATEKEY_FOR_REGISTER);
     const privateKey64 = new Uint8Array(decoded_key);
     const signature = nacl.sign.detached(messageBytes, privateKey64);
     nymRequest.setSignature({signature});
+
     if (!pool) {
-      console.log('there are no Pool');
-    } else {
-      // ✅ Indy Ledger에 트랜잭션 제출
-      const response = await pool.submitRequest(nymRequest);
-      console.log('✅ DID 등록 완료:', response);
-      pool.close();
-      return response;
+      console.error('❌ Pool이 전달되지 않았습니다.');
+      return null;
     }
+
+    // 🚀 전달받은 Pool로 제출 (pool.close() 호출 안 함)
+    const response = await pool.submitRequest(nymRequest);
+    console.log('✅ NYM DID 등록 완료:', response);
+    return response;
   } catch (error) {
-    console.error('❌ DID 등록 실패:', error);
+    console.error('❌ NYM DID 등록 실패:', error);
     return null;
   }
 }
 
-// 25.03.18 추가
-// X25519 키를 ATTRIB 트랜잭션을 통해 DID Document에 추가
-export async function addX25519PublicKey(
+// 단일 ATTRIB 속성(최상위 키 1개)을 원장에 올리는 공통 헬퍼 함수
+export async function sendSingleAttrib(
+  pool: PoolCreate,
   submitterDid: string,
   targetDid: string,
-  x25519PublicKey: string,
+  rawObject: Record<string, any>,
   privateKey: string,
 ) {
-  const pool = await setupIndyPool();
-
   try {
-    // ✅ X25519 공개 키만 포함하는 JSON 데이터 생성
-    const rawData = {
-      'x25519-public-key': x25519PublicKey,
-    };
-
-    // ✅ ATTRIB 트랜잭션 생성 (X25519 키만 저장)
     const attribTransaction = {
-      submitterDid, // ✅ X25519 키를 등록할 DID 소유자
-      targetDid, // ✅ 대상 DID
-      raw: JSON.stringify(rawData), // ✅ X25519 키만 포함
+      submitterDid,
+      targetDid,
+      raw: JSON.stringify(rawObject),
     };
 
-    console.log(
-      '✅ X25519 공개 키 ATTRIB 트랜잭션 JSON:',
-      JSON.stringify(attribTransaction, null, 2),
-    );
-
-    // ✅ AttribRequest 객체 생성
     const attribRequest = new AttribRequest(attribTransaction);
-    console.log('✅ ATTRIB Request 생성 완료:', attribRequest);
-
     const encoder = new TextEncoder();
     const messageBytes = encoder.encode(attribRequest.signatureInput);
 
-    // ✅ Base58로 인코딩된 Private Key를 디코딩하여 Uint8Array로 변환
     const privateKeyUint8Array = bs58.decode(privateKey);
-
-    // ✅ DID 소유자의 Private Key로 서명 (Endorser가 아니라!)
     const signature = nacl.sign.detached(messageBytes, privateKeyUint8Array);
     attribRequest.setSignature({signature});
 
-    if (!pool) {
-      console.log('❌ Pool이 생성되지 않음');
-      return;
-    }
-
-    // ✅ Indy Ledger에 트랜잭션 제출
     const response = await pool.submitRequest(attribRequest);
-    console.log('✅ X25519 공개 키 등록 완료:', response);
-    pool.close();
     return response;
   } catch (error) {
-    console.error('❌ X25519 공개 키 등록 실패:', error);
+    console.error('❌ ATTRIB 단일 전송 실패:', error);
     return null;
   }
 }
 
-// 25.04.09추가
-// 프로젝트 에셋에 제네시스 파일 추가 및 읽어오기
+// X25519 키와 RSA 공개키를 순차적으로 ATTRIB 트랜잭션 등록하는 통합 함수
+export async function addPublicKeysToAttrib(
+  pool: PoolCreate,
+  submitterDid: string,
+  targetDid: string,
+  x25519PublicKey: string,
+  rsaPublicKey: string | undefined,
+  privateKey: string,
+) {
+  try {
+    // 1) X25519 공개키 ATTRIB 전송
+    console.log('🔄 [1/2] X25519 공개키 ATTRIB 등록 중...');
+    const resX25519 = await sendSingleAttrib(
+      pool,
+      submitterDid,
+      targetDid,
+      {'x25519-public-key': x25519PublicKey},
+      privateKey,
+    );
+
+    if (!resX25519) {
+      console.error('❌ X25519 공개키 ATTRIB 등록 실패');
+      return null;
+    }
+
+    // 2) RSA 공개키 ATTRIB 전송 (존재할 경우)
+    if (rsaPublicKey) {
+      console.log('🔄 [2/2] RSA 공개키 ATTRIB 등록 중...');
+      const resRSA = await sendSingleAttrib(
+        pool,
+        submitterDid,
+        targetDid,
+        {'rsa-public-key': rsaPublicKey},
+        privateKey,
+      );
+
+      if (!resRSA) {
+        console.error('❌ RSA 공개키 ATTRIB 등록 실패');
+        return null;
+      }
+    }
+
+    console.log('✅ 모든 공개키(X25519 + RSA) ATTRIB 등록 완료!');
+    return true;
+  } catch (error) {
+    console.error('❌ ATTRIB 등록 전체 과정 실패:', error);
+    return null;
+  }
+}
+
+// 프로젝트 에셋에서 제네시스 파일을 복사해 앱 저장소 경로 반환
 async function copyGenesisFileToAppStorage(): Promise<string> {
   const fileName = 'genesis 3.txn';
   const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
@@ -179,14 +190,13 @@ async function copyGenesisFileToAppStorage(): Promise<string> {
     const assetPath =
       Platform.OS === 'ios'
         ? `${RNFS.MainBundlePath}/${fileName}`
-        : `assets/${fileName}`; // Android는 assets에 바로 접근 불가
+        : `assets/${fileName}`;
 
     try {
       if (Platform.OS === 'ios') {
         await RNFS.copyFile(assetPath, destPath);
       } else {
-        // Android는 assets에서 파일 읽기 위해 raw 리소스로 등록 필요 (추가 설명 아래)
-        const content = await RNFS.readFileRes(fileName, 'utf8'); // Android는 리소스 ID 필요할 수 있음
+        const content = await RNFS.readFileRes(fileName, 'utf8');
         await RNFS.writeFile(destPath, content, 'utf8');
       }
       console.log('Genesis 파일 복사 완료:', destPath);
@@ -197,15 +207,23 @@ async function copyGenesisFileToAppStorage(): Promise<string> {
   return destPath;
 }
 
-// create pool for register did
+// Indy Pool 인스턴스 생성 함수
 export async function setupIndyPool(): Promise<PoolCreate | null> {
-  const genesisFilePath = await copyGenesisFileToAppStorage();
-  const genesisData = await RNFS.readFile(genesisFilePath, 'utf8');
+  try {
+    const genesisFilePath = await copyGenesisFileToAppStorage();
+    const genesisData = await RNFS.readFile(genesisFilePath, 'utf8');
 
-  const pool = new PoolCreate({
-    parameters: {
-      transactions: genesisData,
-    },
-  });
-  return pool;
+    // 📌 [디버그] 앱이 실제로 읽은 제네시스 파일 내용 출력
+    console.log('📌 [DEBUG] 실제로 읽어온 Genesis 내용:\n', genesisData);
+
+    const pool = new PoolCreate({
+      parameters: {
+        transactions: genesisData,
+      },
+    });
+    return pool;
+  } catch (error) {
+    console.error('❌ Indy Pool 생성 실패:', error);
+    return null;
+  }
 }

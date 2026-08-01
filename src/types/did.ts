@@ -8,4 +8,6 @@ export interface DidData {
   createdAt: number;
   alias?: string;
   isRegistered?: boolean;
+  rsaPublicKey?: string;
+  helperData?: string;
 }

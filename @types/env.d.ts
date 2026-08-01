@@ -9,4 +9,5 @@ declare module '@env' {
   export const ISSUER_INNER_PRIVATE_X25519_KEY: string;
   export const ISSUER_INNER_PUBLIC_X25519_KEY: string;
   export const VERIFIER_X25519_PUBLIC_KEY: string;
+  export const FACE_API_TOKEN: string;
 }

@@ -50,7 +50,7 @@ function ProfileScreen() {
       const result_did = await generateSeparateKeyPairs();
 
       // mode: 'GENERATE'를 전달하여 안면 촬영 카메라 진입
-      navigation.navigate('CameraScreen', {
+      navigation.navigate('Camera', {
         mode: 'GENERATE',
         pendingDidKeys: result_did,
       });

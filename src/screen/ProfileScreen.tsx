@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -23,11 +24,15 @@ import {
 // ✅ 중앙 타입 정의 파일에서 DidData를 가져옵니다
 import {DidData} from '../types/did';
 
+// 💡 원장 합의 대기용 헬퍼 함수
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 function ProfileScreen() {
   const navigation = useNavigation<any>();
 
   const [didList, setDidList] = useState<DidData[]>([]);
   const [selectedDid, setSelectedDid] = useState<DidData | null>(null);
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
 
   // 별칭 변경을 위한 상태
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
@@ -55,49 +60,68 @@ function ProfileScreen() {
     }
   };
 
-  // 2. DID 등록 (단일 Pool을 생성하여 NYM + ATTRIB 트랜잭션을 연속 처리)
+  // 2. DID 등록 (타임아웃 방지 및 RSA 포맷 정돈 적용)
   const register_did = async () => {
     if (!selectedDid) {
       Alert.alert('등록 실패', '선택된 DID가 없습니다.');
       return;
     }
 
+    setIsRegistering(true);
+
     // 🚀 [핵심 1] 전체 등록 과정을 관장할 단 1개의 Pool 생성
     const pool = await setupIndyPool();
     if (!pool) {
       Alert.alert('등록 실패', 'Indy Pool 연결에 실패했습니다.');
+      setIsRegistering(false);
       return;
     }
 
     try {
       console.log('🔄 [Step 1] NYM 트랜잭션 전송 중...');
-      // 1. NYM 트랜잭션 (Ed25519 Verkey 등록) - pool 주입
+      // 1. NYM 트랜잭션 (Ed25519 Verkey 등록)
       const registerResponse = await registerDID(
         pool,
-        'J4BALc9uEa8F1GCy7uka7f',
+        'J4BALc9uEa8F1GCy7uka7f', // Trustee DID
         selectedDid.did,
         selectedDid.edVerkey,
       );
 
       if (!registerResponse) {
         Alert.alert('등록 실패', 'DID(NYM) 등록에 실패했습니다.');
+        setIsRegistering(false);
         return;
       }
 
-      console.log('✅ NYM 트랜잭션 완료. ATTRIB (X25519 + RSA) 등록 시작');
+      console.log('✅ NYM 트랜잭션 완료. 노드 합의 대기 중 (1.5초)...');
 
-      // 2. ATTRIB 트랜잭션 (X25519 + RSA 공개키 순차 등록) - 동일한 pool 주입
+      // 🚀 [핵심 2] 원장에서 신규 DID 검증 키(verkey) 반영 및 소켓 세션 안정화를 위해 1.5초 대기
+      await sleep(1500);
+
+      // 🚀 [핵심 3] RSA 키의 PEM 헤더 및 모든 개행문자(\n, \r) 정돈
+      let formattedRsaKey = selectedDid.rsaPublicKey;
+      if (formattedRsaKey) {
+        formattedRsaKey = formattedRsaKey
+          .replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----/g, '')
+          .replace(/\r?\n|\r/g, '')
+          .trim();
+      }
+
+      console.log('🔄 [Step 2 & 3] ATTRIB (X25519 + RSA) 순차 등록 시작');
+
+      // 2. ATTRIB 트랜잭션 (X25519 + RSA 공개키 순차 등록)
       const attribResponse = await addPublicKeysToAttrib(
         pool,
-        selectedDid.did,
-        selectedDid.did,
+        selectedDid.did, // Submitter = 본인 DID
+        selectedDid.did, // Target = 본인 DID
         selectedDid.xVerkey,
-        selectedDid.rsaPublicKey,
+        formattedRsaKey, // 정돈된 RSA Public Key
         selectedDid.edSecretkey,
       );
 
       if (!attribResponse) {
-        Alert.alert('실패', 'ATTRIB 키 추가에 실패했습니다.');
+        Alert.alert('실패', 'ATTRIB 키(X25519/RSA) 추가에 실패했습니다.');
+        setIsRegistering(false);
         return;
       }
 
@@ -121,8 +145,7 @@ function ProfileScreen() {
       console.error('등록 과정 실패:', error);
       Alert.alert('등록 실패', '트랜잭션 중 오류가 발생했습니다.');
     } finally {
-      // 🚀 [핵심 2] 모든 트랜잭션 전송 완료 후 소켓을 깨끗이 종료
-      pool.close();
+      setIsRegistering(false);
     }
   };
 
@@ -292,6 +315,15 @@ function ProfileScreen() {
 
             <Text style={styles.detailLabel}>X25519 Verkey:</Text>
             <Text style={styles.detailValue}>{selectedDid.xVerkey}</Text>
+
+            {selectedDid.rsaPublicKey && (
+              <>
+                <Text style={styles.detailLabel}>RSA Public Key:</Text>
+                <Text style={styles.detailValue} numberOfLines={2}>
+                  {selectedDid.rsaPublicKey.slice(0, 50)}...
+                </Text>
+              </>
+            )}
           </ScrollView>
         ) : (
           <View style={styles.emptyDetail}>
@@ -311,13 +343,18 @@ function ProfileScreen() {
             <TouchableOpacity
               style={[
                 styles.registerButton,
-                selectedDid.isRegistered && styles.disabledButton,
+                (selectedDid.isRegistered || isRegistering) &&
+                  styles.disabledButton,
               ]}
               onPress={register_did}
-              disabled={selectedDid.isRegistered}>
-              <Text style={styles.buttonText}>
-                {selectedDid.isRegistered ? '등록됨' : '등록'}
-              </Text>
+              disabled={selectedDid.isRegistered || isRegistering}>
+              {isRegistering ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {selectedDid.isRegistered ? '등록됨' : '등록'}
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.deleteButton} onPress={remove_did}>

@@ -14,6 +14,10 @@ function HomeScreen({}: HomeScreenProps) {
         title="프로필 페이지"
         onPress={() => navigation.navigate('Profile')}
       />
+      <Button
+        title="로그인 페이지"
+        onPress={() => navigation.navigate('Auth')}
+      />
     </View>
   );
 }

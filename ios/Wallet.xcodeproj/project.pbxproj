@@ -15,6 +15,8 @@
 		903910AF301343050075BD4E /* BCH.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 903910AE301343050075BD4E /* BCH.cpp */; };
 		903910B33013445B0075BD4E /* BCHModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 903910B23013445B0075BD4E /* BCHModule.mm */; };
 		905652DC30105D29001A502F /* genesis 3.txn in Resources */ = {isa = PBXBuildFile; fileRef = 905652DB30105D29001A502F /* genesis 3.txn */; };
+		90839B27302353FF00AE448D /* DeterministicRSA.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 90839B23302353FF00AE448D /* DeterministicRSA.cpp */; };
+		90839B28302353FF00AE448D /* DeterministicRSAModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 90839B25302353FF00AE448D /* DeterministicRSAModule.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,10 @@
 		903910B23013445B0075BD4E /* BCHModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = BCHModule.mm; sourceTree = "<group>"; };
 		903910B4301344A50075BD4E /* BCHModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BCHModule.h; sourceTree = "<group>"; };
 		905652DB30105D29001A502F /* genesis 3.txn */ = {isa = PBXFileReference; lastKnownFileType = text; path = "genesis 3.txn"; sourceTree = "<group>"; };
+		90839B22302353FF00AE448D /* DeterministicRSA.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeterministicRSA.hpp; sourceTree = "<group>"; };
+		90839B23302353FF00AE448D /* DeterministicRSA.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeterministicRSA.cpp; sourceTree = "<group>"; };
+		90839B24302353FF00AE448D /* DeterministicRSAModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeterministicRSAModule.h; sourceTree = "<group>"; };
+		90839B25302353FF00AE448D /* DeterministicRSAModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DeterministicRSAModule.mm; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -103,13 +109,33 @@
 		903910AB301342E50075BD4E /* CPP */ = {
 			isa = PBXGroup;
 			children = (
+				90839B2930235D6B00AE448D /* BCH */,
+				90839B26302353FF00AE448D /* RSA */,
+				903910AC301343050075BD4E /* Wallet-Bridging-Header.h */,
+			);
+			path = CPP;
+			sourceTree = "<group>";
+		};
+		90839B26302353FF00AE448D /* RSA */ = {
+			isa = PBXGroup;
+			children = (
+				90839B22302353FF00AE448D /* DeterministicRSA.hpp */,
+				90839B23302353FF00AE448D /* DeterministicRSA.cpp */,
+				90839B24302353FF00AE448D /* DeterministicRSAModule.h */,
+				90839B25302353FF00AE448D /* DeterministicRSAModule.mm */,
+			);
+			path = RSA;
+			sourceTree = "<group>";
+		};
+		90839B2930235D6B00AE448D /* BCH */ = {
+			isa = PBXGroup;
+			children = (
 				903910AD301343050075BD4E /* BCH.hpp */,
 				903910B4301344A50075BD4E /* BCHModule.h */,
 				903910AE301343050075BD4E /* BCH.cpp */,
-				903910AC301343050075BD4E /* Wallet-Bridging-Header.h */,
 				903910B23013445B0075BD4E /* BCHModule.mm */,
 			);
-			path = CPP;
+			path = BCH;
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -215,9 +241,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Wallet/Pods-Wallet-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Wallet/Pods-Wallet-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -254,9 +284,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Wallet/Pods-Wallet-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Wallet/Pods-Wallet-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -270,6 +304,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90839B27302353FF00AE448D /* DeterministicRSA.cpp in Sources */,
+				90839B28302353FF00AE448D /* DeterministicRSAModule.mm in Sources */,
 				903910B33013445B0075BD4E /* BCHModule.mm in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				903910AF301343050075BD4E /* BCH.cpp in Sources */,
@@ -406,10 +442,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -478,10 +511,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;

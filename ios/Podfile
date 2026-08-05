@@ -32,4 +32,5 @@ target 'Wallet' do
       # :ccache_enabled => true
     )
   end
+  pod 'OpenSSL-Universal'
 end

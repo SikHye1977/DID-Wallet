@@ -26,7 +26,7 @@ function MainTabNavigator() {
         tabBarActiveTintColor: '#3b82f6', // 선택된 탭 활성화 색상 (파란색)
         tabBarInactiveTintColor: '#94a3b8', // 선택 안 된 탭 색상 (회색)
         tabBarStyle: {
-          height: 70, // 1. 전체 높이를 늘려 홈 바 공간을 충분히 확보
+          height: 100, // 1. 전체 높이를 늘려 홈 바 공간을 충분히 확보
           paddingBottom: 20, // 2. 하단 여백을 대폭 주어 아이콘/글자를 위로 띄움
           paddingTop: 8, // 3. 상단 여백 조절
           backgroundColor: '#ffffff',

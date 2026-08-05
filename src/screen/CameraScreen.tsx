@@ -18,7 +18,8 @@ import {useIsFocused, useNavigation, useRoute} from '@react-navigation/native';
 // ✅ react-native-config 대신 @env 모듈 사용
 import {FACE_API_TOKEN} from '@env';
 
-import {generateNativeRSAKeyPair} from '../utils/RSAUtils';
+// 🚀 기존 난수 기반 RSA 대신 C++ Native 결정론적 RSA 모듈 가져오기
+import {generateDeterministicRSAKeyPair} from '../utils/DeterministicRSA';
 
 import {setItem, getItem} from '../utils/AsyncStorage';
 import {Generator} from '../utils/Fuzzy Extractor/FE_Generator';
@@ -130,7 +131,6 @@ function getFaceApiErrorMessage(status: number, detail?: string): string {
 async function requestFaceEmbedding(
   photoPath: string,
 ): Promise<FaceEmbeddingResponse> {
-  // ✅ @env에서 불러온 토큰 변수 사용
   const apiToken = FACE_API_TOKEN;
 
   if (!apiToken) {
@@ -191,14 +191,12 @@ async function requestFaceEmbedding(
       throw new Error('서버 응답에 임베딩 배열이 없습니다.');
     }
 
-    // 🔴 기존 512 -> 🟢 256으로 수정
     if (result.embedding.length !== 256) {
       throw new Error(
         `임베딩 길이가 올바르지 않습니다: ${result.embedding.length}`,
       );
     }
 
-    // 📌 [LOG 1] 256차원 임베딩 벡터 수신 확인
     console.log('====================================');
     console.log('✅ [CHECK 1] Face API 응답 성공');
     console.log(' - Dimension:', result.dimension);
@@ -458,7 +456,7 @@ export default function CameraScreen() {
 
       setStatusText('Fuzzy Extractor 및 생체 키 생성 중...');
 
-      // 🚀 512차원 Float 벡터 이진화 수행
+      // 🚀 256차원 Float 벡터 이진화 수행
       const binarizedInput = binarizeEmbedding(embeddingVector);
 
       // 🚀 이진화된 비트스트림 문자열을 Generator에 전달
@@ -468,13 +466,27 @@ export default function CameraScreen() {
         throw new Error('Fuzzy Extractor 결과가 올바르지 않습니다.');
       }
 
-      const rsaKeyPair = await generateNativeRSAKeyPair();
+      setStatusText('C++ 백그라운드 결정론적 RSA 키 생성 중...');
+
+      // 🚀 feResult.key를 SEED로 넘겨 C++ Native 백그라운드에서 RSA 공개키 유도
+      const rsaResult = await generateDeterministicRSAKeyPair(feResult.key);
+
+      console.log('[FE KEY CHECK]', {
+        type: typeof feResult.key,
+        length: feResult.key?.length,
+        isBinary:
+          typeof feResult.key === 'string' && /^[01]+$/.test(feResult.key),
+        isHex:
+          typeof feResult.key === 'string' &&
+          /^[0-9a-fA-F]+$/.test(feResult.key),
+      });
 
       // 📌 [LOG 3] 추출된 Key(R) 기반 RSA/DID 키 저장 확인
       console.log('====================================');
       console.log('✅ [CHECK 3] 생체 DID 키 바인딩 완료');
       console.log(' - Base Key (R):', feResult.key);
-      console.log(' - Bound rsaPublicKey:', rsaKeyPair.publicKey); // feResult.key를 RSA 키/시드로 바인딩
+      console.log(' - Bound rsaPublicKey:', rsaResult.publicKey);
+      console.log(' - Bound Fingerprint:', rsaResult.fingerprint);
       console.log(' - Bound HelperData:', feResult.helperData);
       console.log(' - Pending DID:', pendingDidKeys.did);
       console.log('====================================');
@@ -485,7 +497,7 @@ export default function CameraScreen() {
         edSecretkey: pendingDidKeys.edPrivateKey,
         xVerkey: pendingDidKeys.x25519PublicKey,
         xSecretkey: pendingDidKeys.x25519PrivateKey,
-        rsaPublicKey: rsaKeyPair.publicKey,
+        rsaPublicKey: rsaResult.publicKey, // 🚀 C++ Native에서 생성된 결정론적 RSA 공개키
         helperData: feResult.helperData,
         createdAt: Date.now(),
         alias: '안면 인증 DID',
@@ -510,15 +522,20 @@ export default function CameraScreen() {
       await setItem('DID_LIST', JSON.stringify(updatedList));
       await setItem('SELECTED_DID', JSON.stringify(newBiometricDid));
 
+      setStatusText('생성 완료! 프로필 화면으로 이동합니다.');
+
       Alert.alert(
         '생성 완료',
         '안면 기반 생체 DID가 성공적으로 만들어졌습니다.',
         [
           {
             text: '확인',
-            onPress: () => navigation.navigate('Profile'),
+            onPress: () => {
+              navigation.navigate('MainTabs', {screen: 'Profile'});
+            },
           },
         ],
+        {cancelable: false},
       );
     } catch (error) {
       console.error('[Face Capture Error]', error);
@@ -529,7 +546,7 @@ export default function CameraScreen() {
           : '안면 인식 DID 생성 중 알 수 없는 오류가 발생했습니다.';
 
       Alert.alert('안면 인증 실패', message);
-    } finally {
+
       setIsProcessing(false);
       setStatusText('가이드라인에 얼굴을 맞추고 촬영하세요.');
     }

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {removeItem, setItem, getItem} from '../utils/AsyncStorage';
 import {
   generateSeparateKeyPairs,
@@ -176,11 +176,14 @@ function ProfileScreen() {
         setDidList(parsedList);
 
         const storedSelected = await getItem('SELECTED_DID');
-        if (parsedList.length > 0) {
-          setSelectedDid(
-            storedSelected ? JSON.parse(storedSelected) : parsedList[0],
-          );
+        if (storedSelected) {
+          setSelectedDid(JSON.parse(storedSelected));
+        } else if (parsedList.length > 0) {
+          setSelectedDid(parsedList[0]);
         }
+      } else {
+        setDidList([]);
+        setSelectedDid(null);
       }
     } catch (error) {
       console.error('DID 로드 실패:', error);
@@ -256,6 +259,13 @@ function ProfileScreen() {
   useEffect(() => {
     migrateOldData();
   }, []);
+
+  // 🚀 화면이 활성화(Focus)될 때마다 최신 DID 목록 및 선택된 DID 다시 로드
+  useFocusEffect(
+    useCallback(() => {
+      loadDidList();
+    }, []),
+  );
 
   // UI 렌더링
   const renderItem = ({item}: {item: DidData}) => (

@@ -1,253 +1,182 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState} from 'react';
 import {
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+
+// 🚀 C++ Native 결정론적 RSA 생성 모듈
 import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-} from 'react-native-vision-camera';
-import {PoolCreate} from '@hyperledger/indy-vdr-react-native';
+  generateDeterministicRSAKeyPair,
+  DeterministicRSAResult,
+} from '../utils/DeterministicRSA';
 
-// 1. 기존 DIDGenerator.ts 모듈 그대로 사용
-import {
-  setupIndyPool,
-  generateSeparateKeyPairs,
-  registerDID,
-  sendSingleAttrib,
-} from '../utils/DIDGenerator';
-
-// 2. RSAUtils.ts에서 네이티브 RSA 키 생성 함수 직접 import
-import {generateNativeRSAKeyPair} from '../utils/RSAUtils';
-
-const SUBMITTER_DID = 'J4BALc9uEa8F1GCy7uka7f';
+type TestLog = {
+  title: string;
+  status: 'SUCCESS' | 'FAIL' | 'INFO';
+  detail: string;
+};
 
 export default function TestRegisterScreen() {
-  const camera = useRef<Camera>(null);
-  const device = useCameraDevice('front');
-  const {hasPermission, requestPermission} = useCameraPermission();
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<TestLog[]>([]);
 
-  const [pool, setPool] = useState<PoolCreate | null>(null);
-  const [keyInfo, setKeyInfo] = useState<any>(null);
-  const [photoPath, setPhotoPath] = useState<string | null>(null);
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  // 이전 카메라 촬영 로그에서 나온 실제 Key(R) 및 Fingerprint
+  const TARGET_SEED =
+    'ea8e9f6f3f98d1f313ddd2a7a93c6dac8a864da7cf9b20d61d898ef407a1be6d';
+  const EXPECTED_FINGERPRINT =
+    '40f6f3cdb77f1154985de86e47da080ddb538dc6e2966fe7aea960a6e4b997bb';
 
-  const addLog = (msg: string) => {
-    console.log(msg);
-    setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-  };
+  const runRsaTest = async () => {
+    setLoading(true);
+    setLogs([]);
+    const testLogs: TestLog[] = [];
 
-  useEffect(() => {
-    const init = async () => {
-      if (!hasPermission) {
-        await requestPermission();
-      }
-
-      addLog('🌐 Indy Pool 접속 중...');
-      const indyPool = await setupIndyPool();
-      if (indyPool) {
-        setPool(indyPool);
-        addLog('✅ Pool 접속 완료!');
-      } else {
-        addLog('❌ Pool 접속 실패');
-      }
+    const addLog = (
+      title: string,
+      status: 'SUCCESS' | 'FAIL' | 'INFO',
+      detail: string,
+    ) => {
+      testLogs.push({title, status, detail});
     };
-    init();
-  }, [hasPermission]);
-
-  // 사진 촬영 후 키 쌍 종합 생성
-  const handleTakePhoto = async () => {
-    if (!camera.current) return;
 
     try {
-      setIsProcessing(true);
-      addLog('📸 얼굴 사진 촬영 중...');
+      // =========================================================================
+      // [테스트 1] 동일 시드 1차 생성
+      // =========================================================================
+      const start1 = Date.now();
+      const res1: DeterministicRSAResult =
+        await generateDeterministicRSAKeyPair(TARGET_SEED);
+      const time1 = Date.now() - start1;
 
-      const photo = await camera.current.takePhoto({
-        enableShutterSound: false,
-      });
+      addLog(
+        '1차 RSA 키 생성 연산',
+        'INFO',
+        `소요 시간: ${time1}ms\nFingerprint: ${res1.fingerprint.slice(
+          0,
+          30,
+        )}...`,
+      );
 
-      setPhotoPath(`file://${photo.path}`);
-      setIsCameraActive(false);
-      addLog('✅ 사진 촬영 완료!');
+      // =========================================================================
+      // [테스트 2] 동일 시드 2차 생성 (재현성 검증)
+      // =========================================================================
+      const start2 = Date.now();
+      const res2: DeterministicRSAResult =
+        await generateDeterministicRSAKeyPair(TARGET_SEED);
+      const time2 = Date.now() - start2;
 
-      // 1) DIDGenerator.ts 에서 Ed25519 & X25519 키 생성
-      addLog('🔑 Ed25519, X25519 키 쌍 및 DID 생성 중...');
-      const baseKeys = await generateSeparateKeyPairs();
+      const isSameReproduced =
+        res1.publicKey === res2.publicKey &&
+        res1.fingerprint === res2.fingerprint;
 
-      // 2) RSAUtils.ts 에서 네이티브 쓰레드로 RSA 2048 키 빠른 생성 (0.1초)
-      addLog('⚡ 네이티브 쓰레드(RSAUtils)에서 RSA 2048 키 생성 중...');
-      const rsaKeys = await generateNativeRSAKeyPair();
+      if (isSameReproduced) {
+        addLog(
+          '1. 동일 SEED 재현성 검증',
+          'SUCCESS',
+          `✅ 성공: 100% 동일한 공개키 및 Fingerprint 복구 완료 (${time2}ms)`,
+        );
+      } else {
+        addLog(
+          '1. 동일 SEED 재현성 검증',
+          'FAIL',
+          '❌ 실패: 동일 시드임에도 서로 다른 키가 생성되었습니다.',
+        );
+      }
 
-      // 3) 키 객체 통합 저장
-      setKeyInfo({
-        ...baseKeys,
-        rsaPublicKey: rsaKeys.publicKey,
-        rsaPrivateKey: rsaKeys.privateKey,
-      });
+      // =========================================================================
+      // [테스트 3] 이전 카메라 촬영 로그값과 일치성 검증
+      // =========================================================================
+      const isMatchedWithTarget = res1.fingerprint === EXPECTED_FINGERPRINT;
 
-      addLog(`✅ Target DID 생성 완료: ${baseKeys.did}`);
-      addLog('✅ 네이티브 RSA 2048-bit 키 쌍 생성 완료!');
+      if (isMatchedWithTarget) {
+        addLog(
+          '2. 이전 카메라 스캔 Fingerprint 일치성',
+          'SUCCESS',
+          '✅ 성공: 이전 카메라 촬영 시 원장에 기록된 Fingerprint와 완벽 일치',
+        );
+      } else {
+        addLog(
+          '2. 이전 카메라 스캔 Fingerprint 일치성',
+          'FAIL',
+          `❌ 실패: Fingerprint 불일치\n- 기대값: ${EXPECTED_FINGERPRINT}\n- 결과값: ${res1.fingerprint}`,
+        );
+      }
+
+      // =========================================================================
+      // [테스트 4] 시드 변형 민감도 검증 (끝 1자 변경)
+      // =========================================================================
+      // 'd' -> 'e'로 끝 1자만 변경
+      const MODIFIED_SEED =
+        'ea8e9f6f3f98d1f313ddd2a7a93c6dac8a864da7cf9b20d61d898ef407a1be6e';
+      const res3: DeterministicRSAResult =
+        await generateDeterministicRSAKeyPair(MODIFIED_SEED);
+
+      const isDifferentKey = res1.fingerprint !== res3.fingerprint;
+
+      if (isDifferentKey) {
+        addLog(
+          '3. 시드 민감도 검증 (1비트 변경 시)',
+          'SUCCESS',
+          `✅ 성공: 시드 변경 시 전혀 다른 Fingerprint 생성됨\n- 변형 키 Fingerprint: ${res3.fingerprint.slice(
+            0,
+            30,
+          )}...`,
+        );
+      } else {
+        addLog(
+          '3. 시드 민감도 검증 (1비트 변경 시)',
+          'FAIL',
+          '❌ 실패: 시드가 달라졌으나 동일한 키가 생성되었습니다.',
+        );
+      }
     } catch (error) {
-      console.error(error);
-      addLog('❌ 촬영 및 키 생성 실패');
+      console.error('[Test Error]', error);
+      addLog(
+        '테스트 연산 중 오류 발생',
+        'FAIL',
+        error instanceof Error ? error.message : '알 수 없는 오류',
+      );
     } finally {
-      setIsProcessing(false);
+      setLogs(testLogs);
+      setLoading(false);
     }
   };
 
-  // Step 1: NYM 등록 (DIDGenerator 사용)
-  const handleRegisterNym = async () => {
-    if (!pool || !keyInfo) return;
-    addLog('🔄 [Step 1] NYM 트랜잭션 전송 중...');
-    const res = await registerDID(
-      pool,
-      SUBMITTER_DID,
-      keyInfo.did,
-      keyInfo.edPublicKey,
-    );
-    if (res) addLog('🎉 [Step 1 성공] NYM DID 등록 완료!');
-    else addLog('❌ [Step 1 실패] NYM 등록 오류');
-  };
-
-  // Step 2: X25519 ATTRIB 등록 (DIDGenerator 사용)
-  const handleRegisterX25519 = async () => {
-    if (!pool || !keyInfo) return;
-    addLog('🔄 [Step 2] X25519 공개키 ATTRIB 등록 중...');
-    const res = await sendSingleAttrib(
-      pool,
-      keyInfo.did,
-      keyInfo.did,
-      {'x25519-public-key': keyInfo.x25519PublicKey},
-      keyInfo.edPrivateKey,
-    );
-    if (res) addLog('🎉 [Step 2 성공] X25519 ATTRIB 등록 완료!');
-    else addLog('❌ [Step 2 실패] X25519 ATTRIB 등록 오류');
-  };
-
-  // Step 3: RSAUtils로 생성한 RSA 공개키 ATTRIB 등록 (DIDGenerator 사용)
-  const handleRegisterRsa = async () => {
-    if (!pool || !keyInfo || !keyInfo.rsaPublicKey) return;
-
-    const cleanRsaKey = keyInfo.rsaPublicKey
-      .replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----/g, '')
-      .replace(/\r?\n|\r/g, '')
-      .trim();
-
-    addLog('🔄 [Step 3] 네이티브 RSA 공개키 ATTRIB 등록 중...');
-    const res = await sendSingleAttrib(
-      pool,
-      keyInfo.did,
-      keyInfo.did,
-      {'rsa-public-key': cleanRsaKey},
-      keyInfo.edPrivateKey,
-    );
-    if (res) addLog('🎉 [Step 3 성공] 네이티브 RSA ATTRIB 등록 완료!');
-    else addLog('❌ [Step 3 실패] RSA ATTRIB 등록 오류');
-  };
-
-  if (isCameraActive && device) {
-    return (
-      <View style={styles.cameraContainer}>
-        <Camera
-          ref={camera}
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={true}
-          photo={true}
-        />
-        <View style={styles.cameraOverlay}>
-          <TouchableOpacity
-            style={styles.shutterBtn}
-            onPress={handleTakePhoto}
-            disabled={isProcessing}>
-            {isProcessing ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <View style={styles.shutterInner} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => setIsCameraActive(false)}>
-            <Text style={styles.closeBtnText}>취소</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>🧪 네이티브 RSA DID 등록 테스트</Text>
+      <Text style={styles.headerTitle}>C++ Native RSA 결정론 검증</Text>
 
-      <View style={styles.photoContainer}>
-        {photoPath ? (
-          <Image source={{uri: photoPath}} style={styles.previewImage} />
+      <TouchableOpacity
+        style={[styles.testButton, loading && styles.disabledButton]}
+        onPress={runRsaTest}
+        disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color="#ffffff" />
         ) : (
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.placeholderText}>얼굴 사진 없음</Text>
-          </View>
+          <Text style={styles.testButtonText}>
+            🧪 RSA 결정론적 키 생성 검증 실행
+          </Text>
         )}
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.cameraStartBtn}
-          onPress={() => setIsCameraActive(true)}
-          disabled={isProcessing}>
-          <Text style={styles.cameraStartBtnText}>
-            {photoPath ? '📸 사진 재촬영하기' : '📸 얼굴 촬영 및 키 생성'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {keyInfo && (
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>Target DID: {keyInfo.did}</Text>
-          <Text style={styles.infoSubText}>
-            Native RSA Key: {keyInfo.rsaPublicKey.slice(0, 35)}...
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.btn, styles.btnNym]}
-          onPress={handleRegisterNym}
-          disabled={!keyInfo}>
-          <Text style={styles.btnText}>1. NYM 등록 (Step 1)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.btn, styles.btnX25519]}
-          onPress={handleRegisterX25519}
-          disabled={!keyInfo}>
-          <Text style={styles.btnText}>2. X25519 ATTRIB 등록 (Step 2)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.btn, styles.btnRsa]}
-          onPress={handleRegisterRsa}
-          disabled={!keyInfo}>
-          <Text style={styles.btnText}>3. RSA ATTRIB 등록 (Step 3)</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.logTitle}>📋 실시간 실행 로그</Text>
-      <ScrollView style={styles.logBox}>
-        {logs.map((log, i) => (
-          <Text key={i} style={styles.logText}>
-            {log}
-          </Text>
+      <ScrollView style={styles.logContainer}>
+        {logs.map((log, index) => (
+          <View
+            key={index}
+            style={[
+              styles.logItem,
+              log.status === 'SUCCESS' && styles.successLog,
+              log.status === 'FAIL' && styles.failLog,
+              log.status === 'INFO' && styles.infoLog,
+            ]}>
+            <Text style={styles.logTitle}>{log.title}</Text>
+            <Text style={styles.logDetail}>{log.detail}</Text>
+          </View>
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -255,82 +184,65 @@ export default function TestRegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f4f6f8', padding: 16},
-  title: {
-    fontSize: 18,
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f8fafc',
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginVertical: 8,
+    color: '#0f172a',
+    marginBottom: 20,
     textAlign: 'center',
   },
-  photoContainer: {alignItems: 'center', marginBottom: 10},
-  previewImage: {width: 90, height: 90, borderRadius: 45, marginBottom: 8},
-  photoPlaceholder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#cbd5e1',
-    justifyContent: 'center',
+  testButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  placeholderText: {fontSize: 11, color: '#475569'},
-  cameraStartBtn: {
-    backgroundColor: '#0f172a',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  cameraStartBtnText: {color: '#fff', fontSize: 13, fontWeight: 'bold'},
-  infoBox: {
-    backgroundColor: '#fff',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 20,
     elevation: 2,
   },
-  infoText: {fontSize: 12, color: '#333', fontWeight: 'bold'},
-  infoSubText: {fontSize: 10, color: '#666', marginTop: 2},
-  buttonContainer: {gap: 8, marginBottom: 12},
-  btn: {padding: 12, borderRadius: 8, alignItems: 'center'},
-  btnNym: {backgroundColor: '#2563eb'},
-  btnX25519: {backgroundColor: '#0d9488'},
-  btnRsa: {backgroundColor: '#7c3aed'},
-  btnText: {color: '#fff', fontSize: 14, fontWeight: 'bold'},
-  logTitle: {
-    fontSize: 13,
+  disabledButton: {
+    backgroundColor: '#94a3b8',
+  },
+  testButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#4b5563',
   },
-  logBox: {flex: 1, backgroundColor: '#1e293b', padding: 10, borderRadius: 8},
-  logText: {
-    color: '#38bdf8',
-    fontSize: 11,
-    marginBottom: 3,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  cameraContainer: {flex: 1, backgroundColor: '#000'},
-  cameraOverlay: {
+  logContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 40,
   },
-  shutterBtn: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logItem: {
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
+    borderLeftWidth: 5,
   },
-  shutterInner: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 2,
-    borderColor: '#000',
+  infoLog: {
+    backgroundColor: '#f1f5f9',
+    borderLeftColor: '#64748b',
   },
-  closeBtn: {position: 'absolute', top: 50, right: 20, padding: 10},
-  closeBtnText: {color: '#fff', fontSize: 16, fontWeight: 'bold'},
+  successLog: {
+    backgroundColor: '#f0fdf4',
+    borderLeftColor: '#22c55e',
+  },
+  failLog: {
+    backgroundColor: '#fef2f2',
+    borderLeftColor: '#ef4444',
+  },
+  logTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+  logDetail: {
+    fontSize: 13,
+    color: '#475569',
+    fontFamily: 'Platform',
+    lineHeight: 18,
+  },
 });

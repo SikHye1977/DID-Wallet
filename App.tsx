@@ -10,6 +10,7 @@ import ProfileScreen from './src/screen/ProfileScreen';
 import CameraScreen from './src/screen/CameraScreen';
 import TestRegisterScreen from './src/screen/TestRegisterScreen';
 import AuthScreen from './src/screen/AuthScreen';
+import TicketDetailScreen from './src/screen/TicketDetailScreen';
 
 // 타입 Import
 import {RootStackParamList, MainTabParamList} from './src/types/navigation';
@@ -17,7 +18,7 @@ import {RootStackParamList, MainTabParamList} from './src/types/navigation';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// 🚀 하단 바텀 탭 내비게이터 컴포넌트
+// 하단 바텀 탭 내비게이터 컴포넌트
 function MainTabNavigator() {
   return (
     <Tab.Navigator
@@ -37,7 +38,7 @@ function MainTabNavigator() {
           fontSize: 12,
           fontWeight: '600',
         },
-        // 🚀 tabBarIcon에서 route.name과 focused 여부에 따라 Vector Icon 지정
+        // tabBarIcon에서 route.name과 focused 여부에 따라 Vector Icon 지정
         tabBarIcon: ({focused, color, size}) => {
           let iconName: string = 'help-outline';
 
@@ -82,7 +83,7 @@ function MainTabNavigator() {
   );
 }
 
-// 🚀 딥링크 구성 (uxmwallet://auth?authRequestId=... 매핑)
+// 딥링크 구성
 const linking = {
   prefixes: ['uxmwallet://'],
   config: {
@@ -113,6 +114,11 @@ function App() {
           name="Test"
           component={TestRegisterScreen}
           options={{title: '네이티브 RSA 테스트'}}
+        />
+        <Stack.Screen
+          name="TicketDetail"
+          component={TicketDetailScreen}
+          options={{headerShown: false}}
         />
       </Stack.Navigator>
     </NavigationContainer>

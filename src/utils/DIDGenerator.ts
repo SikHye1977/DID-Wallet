@@ -213,9 +213,6 @@ export async function setupIndyPool(): Promise<PoolCreate | null> {
     const genesisFilePath = await copyGenesisFileToAppStorage();
     const genesisData = await RNFS.readFile(genesisFilePath, 'utf8');
 
-    // 📌 [디버그] 앱이 실제로 읽은 제네시스 파일 내용 출력
-    console.log('📌 [DEBUG] 실제로 읽어온 Genesis 내용:\n', genesisData);
-
     const pool = new PoolCreate({
       parameters: {
         transactions: genesisData,

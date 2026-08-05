@@ -14,6 +14,7 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Auth: {authRequestId?: string} | undefined;
   Test: undefined;
+  TicketDetail: {vc: any};
 };
 
 // 3. HomeScreen 전용 통합 Navigation Prop 타입 (타입 오류 방지용 교집합)

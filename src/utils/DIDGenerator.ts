@@ -89,7 +89,7 @@ export async function registerDID(
       return null;
     }
 
-    // 🚀 전달받은 Pool로 제출 (pool.close() 호출 안 함)
+    // 전달받은 Pool로 제출
     const response = await pool.submitRequest(nymRequest);
     console.log('✅ NYM DID 등록 완료:', response);
     return response;
@@ -130,7 +130,7 @@ export async function sendSingleAttrib(
   }
 }
 
-// X25519 키와 RSA 공개키를 순차적으로 ATTRIB 트랜잭션 등록하는 통합 함수
+// 🚀 X25519 공개키, RSA 공개키, HelperData(P)를 순차적으로 ATTRIB 트랜잭션 등록하는 통합 함수
 export async function addPublicKeysToAttrib(
   pool: PoolCreate,
   submitterDid: string,
@@ -138,10 +138,11 @@ export async function addPublicKeysToAttrib(
   x25519PublicKey: string,
   rsaPublicKey: string | undefined,
   privateKey: string,
+  helperData?: string | Record<string, any>, // 🚀 HelperData 파라미터 추가
 ) {
   try {
     // 1) X25519 공개키 ATTRIB 전송
-    console.log('🔄 [1/2] X25519 공개키 ATTRIB 등록 중...');
+    console.log('🔄 [1/3] X25519 공개키 ATTRIB 등록 중...');
     const resX25519 = await sendSingleAttrib(
       pool,
       submitterDid,
@@ -157,7 +158,7 @@ export async function addPublicKeysToAttrib(
 
     // 2) RSA 공개키 ATTRIB 전송 (존재할 경우)
     if (rsaPublicKey) {
-      console.log('🔄 [2/2] RSA 공개키 ATTRIB 등록 중...');
+      console.log('🔄 [2/3] RSA 공개키 ATTRIB 등록 중...');
       const resRSA = await sendSingleAttrib(
         pool,
         submitterDid,
@@ -172,7 +173,24 @@ export async function addPublicKeysToAttrib(
       }
     }
 
-    console.log('✅ 모든 공개키(X25519 + RSA) ATTRIB 등록 완료!');
+    // 🚀 3) Fuzzy Extractor HelperData(P) ATTRIB 전송 (존재할 경우)
+    if (helperData) {
+      console.log('🔄 [3/3] HelperData(P) ATTRIB 등록 중...');
+      const resHelper = await sendSingleAttrib(
+        pool,
+        submitterDid,
+        targetDid,
+        {'helper-data': helperData},
+        privateKey,
+      );
+
+      if (!resHelper) {
+        console.error('❌ HelperData ATTRIB 등록 실패');
+        return null;
+      }
+    }
+
+    console.log('✅ 모든 속성(X25519 + RSA + HelperData) ATTRIB 등록 완료!');
     return true;
   } catch (error) {
     console.error('❌ ATTRIB 등록 전체 과정 실패:', error);

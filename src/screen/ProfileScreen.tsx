@@ -24,6 +24,7 @@ import {
 // ✅ 중앙 타입 정의 파일에서 DidData를 가져옵니다
 import {DidData} from '../types/did';
 
+import DidDetail from '../component/profile/DidDetail';
 // 💡 원장 합의 대기용 헬퍼 함수
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -117,6 +118,7 @@ function ProfileScreen() {
         selectedDid.xVerkey,
         formattedRsaKey, // 정돈된 RSA Public Key
         selectedDid.edSecretkey,
+        selectedDid.helperData,
       );
 
       if (!attribResponse) {
@@ -334,6 +336,8 @@ function ProfileScreen() {
                 </Text>
               </>
             )}
+            <Text style={styles.detailLabel}>HelperData:</Text>
+            <Text style={styles.detailValue}>{selectedDid.helperData}</Text>
           </ScrollView>
         ) : (
           <View style={styles.emptyDetail}>

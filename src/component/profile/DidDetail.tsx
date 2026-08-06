@@ -1,77 +1,127 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-import {DidData} from '../../types/did';
+import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+
+interface DidData {
+  did: string;
+  alias?: string;
+  edVerkey?: string;
+  xVerkey?: string;
+  rsaPublicKey?: string;
+  helperData?: string;
+}
 
 interface DidDetailProps {
   selectedDid: DidData | null;
-  onOpenRenameModal: () => void;
+  onRenamePress?: () => void;
 }
 
 export default function DidDetail({
   selectedDid,
-  onOpenRenameModal,
+  onRenamePress,
 }: DidDetailProps) {
+  if (!selectedDid) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>선택된 DID가 없습니다.</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.detailContainer}>
-      <View style={styles.detailHeader}>
-        <Text style={styles.sectionTitle}>선택된 DID 정보</Text>
-        {selectedDid && (
-          <TouchableOpacity onPress={onOpenRenameModal} style={styles.editIcon}>
-            <Text style={styles.editText}>✏️ 이름 변경</Text>
+    <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>선택된 DID 정보</Text>
+        {onRenamePress && (
+          <TouchableOpacity style={styles.renameBtn} onPress={onRenamePress}>
+            <Text style={styles.renameBtnText}>✏️ 이름 변경</Text>
           </TouchableOpacity>
         )}
       </View>
-      {selectedDid ? (
-        <ScrollView style={styles.scrollDetail}>
-          <Text style={styles.detailLabel}>Alias:</Text>
-          <Text style={styles.detailValue}>{selectedDid.alias}</Text>
-          <Text style={styles.detailLabel}>DID:</Text>
-          <Text style={styles.detailValue}>{selectedDid.did}</Text>
-          <Text style={styles.detailLabel}>Ed Verkey:</Text>
-          <Text style={styles.detailValue}>{selectedDid.edVerkey}</Text>
-          <Text style={styles.detailLabel}>X25519 Verkey:</Text>
-          <Text style={styles.detailValue}>{selectedDid.xVerkey}</Text>
-        </ScrollView>
-      ) : (
-        <View style={styles.emptyDetail}>
-          <Text style={styles.emptyText}>목록에서 DID를 선택해주세요.</Text>
-        </View>
-      )}
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Alias:</Text>
+        <Text style={styles.value}>{selectedDid.alias || '-'}</Text>
+
+        <Text style={styles.label}>DID:</Text>
+        <Text style={styles.value}>{selectedDid.did}</Text>
+
+        {selectedDid.edVerkey && (
+          <>
+            <Text style={styles.label}>Ed Verkey:</Text>
+            <Text style={styles.value}>{selectedDid.edVerkey}</Text>
+          </>
+        )}
+
+        {selectedDid.xVerkey && (
+          <>
+            <Text style={styles.label}>X25519 Verkey:</Text>
+            <Text style={styles.value}>{selectedDid.xVerkey}</Text>
+          </>
+        )}
+
+        {selectedDid.rsaPublicKey && (
+          <>
+            <Text style={styles.label}>RSA Public Key:</Text>
+            <Text style={styles.value} numberOfLines={3} ellipsizeMode="tail">
+              {selectedDid.rsaPublicKey}
+            </Text>
+          </>
+        )}
+
+        {/* 🚀 Helper Data 항목 추가 */}
+        <Text style={styles.label}>Helper Data:</Text>
+        <Text style={styles.value} numberOfLines={3} ellipsizeMode="tail">
+          {selectedDid.helperData}
+        </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  detailContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 10,
   },
-  detailHeader: {
+  emptyText: {
+    color: '#888',
+    textAlign: 'center',
+  },
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  sectionTitle: {fontSize: 16, fontWeight: '600', color: '#555'},
-  editIcon: {
-    backgroundColor: '#e0e7ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 5,
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
-  editText: {fontSize: 12, color: '#3b82f6', fontWeight: 'bold'},
-  scrollDetail: {flex: 1},
-  detailLabel: {fontSize: 12, fontWeight: 'bold', color: '#888', marginTop: 8},
-  detailValue: {fontSize: 14, color: '#333', marginBottom: 4},
-  emptyDetail: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  emptyText: {color: '#999', textAlign: 'center', padding: 20},
+  renameBtn: {
+    backgroundColor: '#e8f0fe',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  renameBtnText: {
+    fontSize: 12,
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  fieldGroup: {
+    gap: 4,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 6,
+  },
+  value: {
+    fontSize: 13,
+    color: '#333',
+  },
 });

@@ -81,3 +81,6 @@ ios/genesis 3.txn
 # Environments (보안 필수)
 .env
 .env.*
+
+# FCM
+GoogleService-Info.plist

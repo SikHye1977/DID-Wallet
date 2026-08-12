@@ -12,6 +12,8 @@
   "dependencies": {
     "@hyperledger/indy-vdr-react-native": "^0.3.0",
     "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-firebase/app": "^26.2.0",
+    "@react-native-firebase/messaging": "^26.2.0",
     "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-navigation/bottom-tabs": "^7.18.14",
     "@react-navigation/native": "^7.3.13",
@@ -36,7 +38,8 @@
     "react-native-vector-icons": "^10.3.0",
     "react-native-vision-camera": "^4.7.3",
     "react-native-worklets-core": "^1.6.2",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

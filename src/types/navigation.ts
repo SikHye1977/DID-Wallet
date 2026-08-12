@@ -4,7 +4,7 @@ import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 
 // 1. 하단 탭 내비게이터 파라미터 타입
 export type MainTabParamList = {
-  Home: undefined;
+  Home: {targetUrl?: string} | undefined; // 👈 targetUrl을 받아들일 수 있도록 수정
   Camera: {mode?: string; pendingDidKeys?: any} | undefined;
   Profile: undefined;
 };
@@ -17,7 +17,7 @@ export type RootStackParamList = {
   TicketDetail: {vc: any};
 };
 
-// 3. HomeScreen 전용 통합 Navigation Prop 타입 (타입 오류 방지용 교집합)
+// 3. Navigation Prop 타입
 export type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList & MainTabParamList
 >;
@@ -26,6 +26,7 @@ export type CameraScreenNavigationProp = BottomTabNavigationProp<
   MainTabParamList,
   'Camera'
 >;
+
 export type ProfileScreenNavigationProp = BottomTabNavigationProp<
   MainTabParamList,
   'Profile'

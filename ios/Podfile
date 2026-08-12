@@ -5,6 +5,8 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+$RNFirebaseDisableSPM = true
+
 platform :ios, '15.5'
 prepare_react_native_project!
 
@@ -15,6 +17,9 @@ if linkage != nil
 end
 
 target 'Wallet' do
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  
   config = use_native_modules!
 
   use_react_native!(

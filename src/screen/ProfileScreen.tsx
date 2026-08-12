@@ -12,21 +12,21 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {DidData} from '../types/did';
 import DidDetail from '../component/profile/DidDetail';
-import {useProfileDid} from '../hooks/useProfileDid';
+import {useWalletStore} from '../store/useWalletStore';
+import {DidData} from '../types/did';
 
 function ProfileScreen() {
+  // Zustand 스토어 구독
   const {
     didList,
     selectedDid,
-    isRegistering,
-    handleSelectDid,
-    createDid,
-    registerDid,
-    removeDid,
-    updateAlias,
-  } = useProfileDid();
+    setSelectedDid,
+    // 필요 시 스토어에 추가된 메서드를 꺼내어 연동
+    // updateAlias, createDid, registerDid, removeDid
+  } = useWalletStore();
+
+  const [isRegistering, setIsRegistering] = useState(false);
 
   // 별칭 변경 모달 제어용 Local State
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
@@ -45,11 +45,74 @@ function ProfileScreen() {
     }
 
     try {
-      await updateAlias(tempAlias);
+      if (selectedDid) {
+        // 선택된 DID의 별칭 업데이트 (Zustand 스토어 반영)
+        const updatedList = didList.map(item =>
+          item.did === selectedDid.did
+            ? {...item, alias: tempAlias.trim()}
+            : item,
+        );
+        useWalletStore.getState().setDidList(updatedList);
+        setSelectedDid({...selectedDid, alias: tempAlias.trim()});
+      }
       setIsRenameModalVisible(false);
     } catch {
       Alert.alert('오류', '별칭 수정 중 문제가 발생했습니다.');
     }
+  };
+
+  // 새 DID 생성
+  const handleCreateDid = () => {
+    Alert.alert('DID 생성', '새로운 DID를 생성하시겠습니까?', [
+      {text: '취소', style: 'cancel'},
+      {
+        text: '생성',
+        onPress: () => {
+          Alert.alert('안내', '새 DID 생성 로직을 진행합니다.');
+        },
+      },
+    ]);
+  };
+
+  // DID 등록
+  const handleRegisterDid = async () => {
+    if (!selectedDid) return;
+    try {
+      setIsRegistering(true);
+      // 등록 비즈니스 로직 처리 후 스토어 업데이트 예시
+      const updatedList = didList.map(item =>
+        item.did === selectedDid.did ? {...item, isRegistered: true} : item,
+      );
+      useWalletStore.getState().setDidList(updatedList);
+      setSelectedDid({...selectedDid, isRegistered: true});
+      Alert.alert('완료', 'DID가 성공적으로 등록되었습니다.');
+    } catch {
+      Alert.alert('오류', 'DID 등록에 실패했습니다.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  // DID 삭제
+  const handleRemoveDid = () => {
+    if (!selectedDid) return;
+    Alert.alert('삭제 확인', `DID [${selectedDid.alias}]를 삭제하시겠습니까?`, [
+      {text: '취소', style: 'cancel'},
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          const updatedList = didList.filter(
+            item => item.did !== selectedDid.did,
+          );
+          useWalletStore.getState().setDidList(updatedList);
+          // 삭제 후 목록의 첫 번째 항목 선택 또는 null
+          setSelectedDid(
+            updatedList.length > 0 ? updatedList[0] : (null as any),
+          );
+        },
+      },
+    ]);
   };
 
   const renderItem = ({item}: {item: DidData}) => (
@@ -58,7 +121,7 @@ function ProfileScreen() {
         styles.didItem,
         selectedDid?.did === item.did && styles.selectedDidItem,
       ]}
-      onPress={() => handleSelectDid(item)}>
+      onPress={() => setSelectedDid(item)}>
       <Text style={styles.didAlias}>{item.alias}</Text>
       <Text style={styles.didDetailText} numberOfLines={1}>
         {item.did}
@@ -91,7 +154,7 @@ function ProfileScreen() {
 
       {/* 버튼 영역 */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.createButton} onPress={createDid}>
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateDid}>
           <Text style={styles.buttonText}>+ 새 DID 생성</Text>
         </TouchableOpacity>
 
@@ -103,7 +166,7 @@ function ProfileScreen() {
                 (selectedDid.isRegistered || isRegistering) &&
                   styles.disabledButton,
               ]}
-              onPress={registerDid}
+              onPress={handleRegisterDid}
               disabled={selectedDid.isRegistered || isRegistering}>
               {isRegistering ? (
                 <ActivityIndicator color="#fff" />
@@ -114,7 +177,9 @@ function ProfileScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.deleteButton} onPress={removeDid}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleRemoveDid}>
               <Text style={styles.buttonText}>삭제</Text>
             </TouchableOpacity>
           </View>

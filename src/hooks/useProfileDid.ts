@@ -1,8 +1,6 @@
-// src/hooks/useProfileDid.ts
-import {useState, useEffect, useCallback} from 'react';
+import {useState} from 'react';
 import {Alert} from 'react-native';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
-import {removeItem, setItem, getItem} from '../utils/storage/AsyncStorage';
+import {useNavigation} from '@react-navigation/native';
 import {
   generateSeparateKeyPairs,
   registerDID,
@@ -10,23 +8,24 @@ import {
   setupIndyPool,
 } from '../utils/did/DIDGenerator';
 import {DidData} from '../types/did';
+import {useWalletStore} from '../store/useWalletStore';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const useProfileDid = () => {
   const navigation = useNavigation<any>();
 
-  const [didList, setDidList] = useState<DidData[]>([]);
-  const [selectedDid, setSelectedDid] = useState<DidData | null>(null);
+  // 💡 Zustand 스토어 상태 및 액션 연결
+  const {didList, selectedDid, setDidList, setSelectedDid} = useWalletStore();
+
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
 
-  // 선택된 DID 저장 및 반영
-  const handleSelectDid = async (item: DidData) => {
+  // 1. 선택된 DID 변경 (Zustand 스토어 자동 저장)
+  const handleSelectDid = (item: DidData) => {
     setSelectedDid(item);
-    await setItem('SELECTED_DID', JSON.stringify(item));
   };
 
-  // 1. 새 DID 생성 (키 생성 후 카메라 화면 진입)
+  // 2. 새 DID 생성 (키 생성 후 카메라 화면 진입 - 기존 로직 유지)
   const createDid = async () => {
     try {
       const result_did = await generateSeparateKeyPairs();
@@ -40,7 +39,7 @@ export const useProfileDid = () => {
     }
   };
 
-  // 2. Indy 원장 DID 및 공개키 등록
+  // 3. Indy 원장 DID 및 공개키 등록
   const registerDid = async () => {
     if (!selectedDid) {
       Alert.alert('등록 실패', '선택된 DID가 없습니다.');
@@ -62,7 +61,7 @@ export const useProfileDid = () => {
         pool,
         'J4BALc9uEa8F1GCy7uka7f', // Trustee DID
         selectedDid.did,
-        selectedDid.edVerkey,
+        selectedDid.edVerkey || '',
       );
 
       if (!registerResponse) {
@@ -87,9 +86,9 @@ export const useProfileDid = () => {
         pool,
         selectedDid.did,
         selectedDid.did,
-        selectedDid.xVerkey,
+        selectedDid.xVerkey || '',
         formattedRsaKey,
-        selectedDid.edSecretkey,
+        selectedDid.edSecretkey || '',
         selectedDid.helperData,
       );
 
@@ -99,19 +98,18 @@ export const useProfileDid = () => {
         return;
       }
 
+      // Zustand 스토어 업데이트
       const updatedDid = {...selectedDid, isRegistered: true};
       const updatedList = didList.map(item =>
         item.did === selectedDid.did ? {...item, isRegistered: true} : item,
       );
 
       setDidList(updatedList);
-      await handleSelectDid(updatedDid);
-
-      await setItem('DID_LIST', JSON.stringify(updatedList));
+      setSelectedDid(updatedDid);
 
       Alert.alert(
         '등록 성공',
-        `DID(${selectedDid.alias})가 원장에 정상 등록되었습니다!`,
+        `DID(${selectedDid.alias || 'DID'})가 원장에 정상 등록되었습니다!`,
       );
     } catch (error) {
       console.error('등록 과정 실패:', error);
@@ -121,77 +119,23 @@ export const useProfileDid = () => {
     }
   };
 
-  // 3. 특정 DID 삭제
+  // 4. 특정 DID 삭제 (Zustand 스토어 반영)
   const removeDid = async () => {
     if (!selectedDid) return;
 
     try {
       const updatedList = didList.filter(item => item.did !== selectedDid.did);
       setDidList(updatedList);
-      setSelectedDid(null);
-      await removeItem('SELECTED_DID');
-      await setItem('DID_LIST', JSON.stringify(updatedList));
+
+      // 삭제 후 목록의 첫 번째 항목 선택 또는 null
+      setSelectedDid(updatedList.length > 0 ? updatedList[0] : null);
       Alert.alert('삭제 성공', '선택한 DID가 삭제되었습니다.');
     } catch (error) {
       console.error('삭제 실패:', error);
     }
   };
 
-  // 4. 저장된 DID 목록 불러오기
-  const loadDidList = async () => {
-    try {
-      const storedList = await getItem('DID_LIST');
-      if (storedList) {
-        const parsedList: DidData[] = JSON.parse(storedList);
-        setDidList(parsedList);
-
-        const storedSelected = await getItem('SELECTED_DID');
-        if (storedSelected) {
-          setSelectedDid(JSON.parse(storedSelected));
-        } else if (parsedList.length > 0) {
-          setSelectedDid(parsedList[0]);
-        }
-      } else {
-        setDidList([]);
-        setSelectedDid(null);
-      }
-    } catch (error) {
-      console.error('DID 로드 실패:', error);
-    }
-  };
-
-  // 5. 이전 데이터 단일 DID $\rightarrow$ 리스트 마이그레이션
-  const migrateOldData = async () => {
-    const oldDid = await getItem('DID');
-    if (oldDid) {
-      const oldEdVerkey = await getItem('edVerkey');
-      const oldEdSecret = await getItem('edSecretkey');
-      const oldXVerkey = await getItem('xVerkey');
-      const oldXSecret = await getItem('xSecretkey');
-
-      const migratedDid: DidData = {
-        did: oldDid,
-        edVerkey: oldEdVerkey,
-        edSecretkey: oldEdSecret,
-        xVerkey: oldXVerkey,
-        xSecretkey: oldXSecret,
-        createdAt: Date.now(),
-        alias: '기존 DID',
-      };
-
-      const newList = [migratedDid];
-      await setItem('DID_LIST', JSON.stringify(newList));
-      setDidList(newList);
-      setSelectedDid(migratedDid);
-
-      await handleSelectDid(migratedDid);
-      await removeItem('DID');
-    } else {
-      loadDidList();
-    }
-  };
-
-  // 6. 별칭 업데이트
+  // 5. 별칭 업데이트 (Zustand 스토어 반영)
   const updateAlias = async (newAlias: string) => {
     if (!selectedDid) return;
 
@@ -202,23 +146,12 @@ export const useProfileDid = () => {
       );
 
       setDidList(updatedList);
-      await handleSelectDid(updatedDid);
-      await setItem('DID_LIST', JSON.stringify(updatedList));
+      setSelectedDid(updatedDid);
     } catch (e) {
       console.error('별칭 수정 실패:', e);
       throw e;
     }
   };
-
-  useEffect(() => {
-    migrateOldData();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadDidList();
-    }, []),
-  );
 
   return {
     didList,

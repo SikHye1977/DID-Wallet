@@ -13,22 +13,22 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import DidDetail from '../component/profile/DidDetail';
-import {useWalletStore} from '../store/useWalletStore';
+import {useProfileDid} from '../hooks/useProfileDid'; // 👈 useProfileDid 임포트
 import {DidData} from '../types/did';
 
 function ProfileScreen() {
-  // Zustand 스토어 구독
+  // 💡 커스텀 훅에서 함수들을 올바르게 구조분해 할당합니다.
   const {
     didList,
     selectedDid,
-    setSelectedDid,
-    // 필요 시 스토어에 추가된 메서드를 꺼내어 연동
-    // updateAlias, createDid, registerDid, removeDid
-  } = useWalletStore();
+    isRegistering,
+    handleSelectDid,
+    createDid, // 👈 useProfileDid 내부의 createDid 사용
+    registerDid,
+    removeDid,
+    updateAlias,
+  } = useProfileDid();
 
-  const [isRegistering, setIsRegistering] = useState(false);
-
-  // 별칭 변경 모달 제어용 Local State
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [tempAlias, setTempAlias] = useState('');
 
@@ -45,71 +45,21 @@ function ProfileScreen() {
     }
 
     try {
-      if (selectedDid) {
-        // 선택된 DID의 별칭 업데이트 (Zustand 스토어 반영)
-        const updatedList = didList.map(item =>
-          item.did === selectedDid.did
-            ? {...item, alias: tempAlias.trim()}
-            : item,
-        );
-        useWalletStore.getState().setDidList(updatedList);
-        setSelectedDid({...selectedDid, alias: tempAlias.trim()});
-      }
+      await updateAlias(tempAlias);
       setIsRenameModalVisible(false);
     } catch {
       Alert.alert('오류', '별칭 수정 중 문제가 발생했습니다.');
     }
   };
 
-  // 새 DID 생성
+  // 💡 버튼 클릭 시 handleCreateDid를 거쳐 createDid() 호출
   const handleCreateDid = () => {
     Alert.alert('DID 생성', '새로운 DID를 생성하시겠습니까?', [
       {text: '취소', style: 'cancel'},
       {
         text: '생성',
         onPress: () => {
-          Alert.alert('안내', '새 DID 생성 로직을 진행합니다.');
-        },
-      },
-    ]);
-  };
-
-  // DID 등록
-  const handleRegisterDid = async () => {
-    if (!selectedDid) return;
-    try {
-      setIsRegistering(true);
-      // 등록 비즈니스 로직 처리 후 스토어 업데이트 예시
-      const updatedList = didList.map(item =>
-        item.did === selectedDid.did ? {...item, isRegistered: true} : item,
-      );
-      useWalletStore.getState().setDidList(updatedList);
-      setSelectedDid({...selectedDid, isRegistered: true});
-      Alert.alert('완료', 'DID가 성공적으로 등록되었습니다.');
-    } catch {
-      Alert.alert('오류', 'DID 등록에 실패했습니다.');
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
-  // DID 삭제
-  const handleRemoveDid = () => {
-    if (!selectedDid) return;
-    Alert.alert('삭제 확인', `DID [${selectedDid.alias}]를 삭제하시겠습니까?`, [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: () => {
-          const updatedList = didList.filter(
-            item => item.did !== selectedDid.did,
-          );
-          useWalletStore.getState().setDidList(updatedList);
-          // 삭제 후 목록의 첫 번째 항목 선택 또는 null
-          setSelectedDid(
-            updatedList.length > 0 ? updatedList[0] : (null as any),
-          );
+          createDid(); // 👈 useProfileDid()에서 꺼낸 createDid 실행
         },
       },
     ]);
@@ -121,8 +71,8 @@ function ProfileScreen() {
         styles.didItem,
         selectedDid?.did === item.did && styles.selectedDidItem,
       ]}
-      onPress={() => setSelectedDid(item)}>
-      <Text style={styles.didAlias}>{item.alias}</Text>
+      onPress={() => handleSelectDid(item)}>
+      <Text style={styles.didAlias}>{item.alias || 'DID'}</Text>
       <Text style={styles.didDetailText} numberOfLines={1}>
         {item.did}
       </Text>
@@ -133,7 +83,6 @@ function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>DID Wallet</Text>
 
-      {/* DID 목록 영역 */}
       <View style={styles.listContainer}>
         <Text style={styles.sectionTitle}>
           보유 DID 목록 ({didList.length})
@@ -149,10 +98,8 @@ function ProfileScreen() {
         />
       </View>
 
-      {/* 선택된 DID 상세 정보 */}
       <DidDetail selectedDid={selectedDid} onRenamePress={openRenameModal} />
 
-      {/* 버튼 영역 */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.createButton} onPress={handleCreateDid}>
           <Text style={styles.buttonText}>+ 새 DID 생성</Text>
@@ -166,7 +113,7 @@ function ProfileScreen() {
                 (selectedDid.isRegistered || isRegistering) &&
                   styles.disabledButton,
               ]}
-              onPress={handleRegisterDid}
+              onPress={registerDid}
               disabled={selectedDid.isRegistered || isRegistering}>
               {isRegistering ? (
                 <ActivityIndicator color="#fff" />
@@ -177,16 +124,13 @@ function ProfileScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={handleRemoveDid}>
+            <TouchableOpacity style={styles.deleteButton} onPress={removeDid}>
               <Text style={styles.buttonText}>삭제</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {/* 별칭 수정 모달 */}
       <Modal
         visible={isRenameModalVisible}
         transparent={true}

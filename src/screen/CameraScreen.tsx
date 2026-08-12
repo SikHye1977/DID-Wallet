@@ -24,6 +24,8 @@ import {generateDeterministicRSAKeyPair} from '../utils/crypto/DeterministicRSA'
 import {setItem, getItem} from '../utils/storage/AsyncStorage';
 import {Generator} from '../utils/crypto/FE_Generator';
 
+import {useWalletStore} from '../store/useWalletStore';
+
 /**
  * Face Embedding API
  *
@@ -504,23 +506,17 @@ export default function CameraScreen() {
         isRegistered: false,
       };
 
-      const storedList = await getItem('DID_LIST');
-      let currentList: any[] = [];
+      // 💡 [Zustand 스토어 반영] -------------------------------------
+      // 1. 현재 Zustand 스토어에 존재하는 DID 목록 가져오기
+      const currentList = useWalletStore.getState().didList;
 
-      if (storedList) {
-        try {
-          const parsed = JSON.parse(storedList);
-          currentList = Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-          console.error('[DID_LIST] JSON 파싱 실패:', error);
-          currentList = [];
-        }
-      }
-
+      // 2. 새 안면 인증 DID 추가한 리스트 생성
       const updatedList = [...currentList, newBiometricDid];
 
-      await setItem('DID_LIST', JSON.stringify(updatedList));
-      await setItem('SELECTED_DID', JSON.stringify(newBiometricDid));
+      // 3. Zustand 상태 업데이트 (AsyncStorage와 자동 연동 및 화면 즉시 리렌더링)
+      useWalletStore.getState().setDidList(updatedList);
+      useWalletStore.getState().setSelectedDid(newBiometricDid);
+      // -------------------------------------------------------------
 
       setStatusText('생성 완료! 프로필 화면으로 이동합니다.');
 

@@ -10,7 +10,8 @@ interface WalletState {
   vcList: any[];
 
   setDidList: (list: DidData[]) => void;
-  setSelectedDid: (did: DidData) => void;
+  // ⭕️ null 인수를 받을 수 있도록 타입 지정
+  setSelectedDid: (did: DidData | null) => void;
   setVcList: (list: any[]) => void;
   addVc: (vc: any) => void;
   removeVc: (ticketNumber: string) => void;

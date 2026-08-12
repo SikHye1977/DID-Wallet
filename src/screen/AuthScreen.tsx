@@ -1,3 +1,4 @@
+// src/screens/AuthScreen.tsx
 import React, {useEffect, useState} from 'react';
 import {
   StyleSheet,
@@ -6,154 +7,44 @@ import {
   View,
   Modal,
   FlatList,
-  Alert,
-  ActivityIndicator, // ✅ 로딩 표시용 추가
+  ActivityIndicator,
 } from 'react-native';
-import {getItem} from '../utils/AsyncStorage';
-import {
-  decrypt_challenge,
-  get_challenge,
-  regist_token,
-  verify_challenge,
-} from '../utils/DIDAuth';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {RouteProp, useRoute} from '@react-navigation/native';
-import {useNavigation} from '@react-navigation/native';
+import {RouteProp, useRoute, useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 
-import {DidData} from '../types/did';
+import {useDidAuth} from '../hooks/useDidAuth';
 
-type AuthScreenRouteParams = {authRequestId?: string};
 type RootStackParamList = {
-  MainTabs: undefined | {screen: keyof MainTabParamList};
+  MainTabs: undefined | {screen: string};
   Auth: {authRequestId?: string};
-};
-type MainTabParamList = {
-  Home: undefined;
-  Ticket: undefined;
-  Profile: undefined;
 };
 
 function AuthScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Auth'>>();
+
   const [authRequestId, setAuthRequestId] = useState<string | undefined>(
     undefined,
   );
 
-  const [didList, setDidList] = useState<DidData[]>([]);
-  const [selectedDid, setSelectedDid] = useState<DidData | null>(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [token, setToken] = useState<any>(null);
-
-  // ✅ 로딩 상태 추가
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-
-  // 화면 표시용 (실제 로직에는 로컬 변수 사용)
-  const [progressLog, setProgressLog] = useState<string>('대기 중...');
-
-  const loadDidList = async () => {
-    try {
-      const storedToken = await getItem('fcmToken');
-      setToken(storedToken);
-      const listJson = await getItem('DID_LIST');
-      if (listJson) {
-        const list: DidData[] = JSON.parse(listJson);
-        setDidList(list);
-        const storedSelected = await getItem('SELECTED_DID');
-        if (storedSelected) {
-          setSelectedDid(JSON.parse(storedSelected));
-        } else if (list.length > 0) {
-          setSelectedDid(list[0]);
-        }
-      }
-    } catch (error) {
-      console.error('DID 로드 실패:', error);
-    }
-  };
-
   useEffect(() => {
     setAuthRequestId(route.params?.authRequestId);
-    loadDidList();
   }, [route]);
 
-  const handleSelectDid = (item: DidData) => {
-    setSelectedDid(item);
-    setIsModalVisible(false);
-    setProgressLog('대기 중...');
-  };
-
-  // ==========================================================
-  // 25.11.25 추가 및 수정
-  // 통합 인증함수
-  // ==========================================================
-  const handleOneClickAuth = async () => {
-    // 0. 사전 체크
-    if (!selectedDid || !authRequestId) {
-      Alert.alert('오류', 'DID 또는 Request ID가 없습니다.');
-      return;
-    }
-
-    setIsAuthLoading(true); // 로딩 시작
-    setProgressLog('1. Challenge 요청 중...');
-
-    try {
-      // ----------------------------------------------------
-      // 1. Challenge 요청
-      // ----------------------------------------------------
-      const challengeRes = await get_challenge(
-        authRequestId,
-        selectedDid.did,
-        token,
-      );
-
-      if (!challengeRes) {
-        throw new Error('Challenge 생성 실패');
-      }
-      setProgressLog('2. Challenge 복호화 중...');
-
-      // ----------------------------------------------------
-      // 2. Challenge 복호화
-      // (state가 아닌 방금 받은 challengeRes 변수를 바로 사용)
-      // ----------------------------------------------------
-      const decryptedRes = await decrypt_challenge(
-        challengeRes,
-        selectedDid.xSecretkey, // <--- 여기서 선택된 DID의 키를 넘겨줌
-      );
-
-      if (!decryptedRes) {
-        throw new Error('복호화 실패');
-      }
-      setProgressLog('3. 최종 검증 중...');
-
-      // ----------------------------------------------------
-      // 3. 최종 검증 (Verify)
-      // ----------------------------------------------------
-      const verifyRes = await verify_challenge(
-        authRequestId,
-        selectedDid.did,
-        decryptedRes,
-      );
-
-      if (verifyRes === true) {
-        setProgressLog('✅ 인증 성공!');
-        Alert.alert('성공', 'DID Auth에 성공했습니다.', [
-          {
-            text: '확인',
-            onPress: () => navigation.navigate('MainTabs', {screen: 'Home'}),
-          },
-        ]);
-      } else {
-        throw new Error('검증 결과: 실패');
-      }
-    } catch (error: any) {
-      console.error('Auth Process Error:', error);
-      setProgressLog(`❌ 실패: ${error.message || '알 수 없는 오류'}`);
-      Alert.alert('인증 실패', error.message || '과정 중 문제가 발생했습니다.');
-    } finally {
-      setIsAuthLoading(false); // 로딩 종료
-    }
-  };
+  // 커스텀 훅 불러오기 (인증 성공 시 Home 화면 이동 콜백 전달)
+  const {
+    didList,
+    selectedDid,
+    isModalVisible,
+    setIsModalVisible,
+    isAuthLoading,
+    progressLog,
+    handleSelectDid,
+    handleOneClickAuth,
+  } = useDidAuth(authRequestId, () => {
+    navigation.navigate('MainTabs', {screen: 'Home'});
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -198,14 +89,6 @@ function AuthScreen() {
             <Text style={styles.mainButtonText}>인증하기</Text>
           )}
         </TouchableOpacity>
-
-        {/* 기존 개별 버튼들은 테스트용으로 작게 남겨두거나 숨김 */}
-        {/* <View style={styles.debugContainer}>
-            <Text style={{marginBottom: 5, color: '#999'}}>디버그용 개별 실행</Text>
-            <TouchableOpacity onPress={registtoken}><Text>FCM 토큰 등록</Text></TouchableOpacity>
-            ...
-        </View> 
-        */}
       </View>
 
       {/* DID 선택 모달 */}
@@ -247,12 +130,12 @@ function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
+  // 기존 스타일 동일 유지
   container: {flex: 1, padding: 20, backgroundColor: '#f9f9f9'},
   header: {alignItems: 'center', marginTop: 20},
   title: {fontSize: 22, fontWeight: 'bold', marginBottom: 5, color: '#333'},
   subText: {fontSize: 14, color: '#666', marginBottom: 20},
   label: {fontSize: 14, color: '#555', marginBottom: 5},
-
   selectorContainer: {
     width: '100%',
     backgroundColor: '#fff',
@@ -273,13 +156,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   changeButtonText: {color: '#3b82f6', fontWeight: 'bold', fontSize: 12},
-
   statusContainer: {marginTop: 20},
   statusText: {fontSize: 14, color: '#333', fontWeight: '600'},
-
   buttonContainer: {marginTop: 40, width: '100%', alignItems: 'center'},
-
-  // ✅ 메인 버튼 스타일 강조
   mainButton: {
     backgroundColor: '#3b82f6',
     width: '100%',
@@ -295,8 +174,6 @@ const styles = StyleSheet.create({
   },
   mainButtonText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
   disabledButton: {backgroundColor: '#9ca3af'},
-
-  // 모달 스타일 (기존 유지)
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

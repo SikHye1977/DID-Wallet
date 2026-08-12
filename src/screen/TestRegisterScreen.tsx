@@ -13,7 +13,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   generateDeterministicRSAKeyPair,
   DeterministicRSAResult,
-} from '../utils/DeterministicRSA';
+} from '../utils/crypto/DeterministicRSA';
 
 type TestLog = {
   title: string;

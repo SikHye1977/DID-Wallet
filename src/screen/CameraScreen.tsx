@@ -19,10 +19,10 @@ import {useIsFocused, useNavigation, useRoute} from '@react-navigation/native';
 import {FACE_API_TOKEN} from '@env';
 
 // 🚀 기존 난수 기반 RSA 대신 C++ Native 결정론적 RSA 모듈 가져오기
-import {generateDeterministicRSAKeyPair} from '../utils/DeterministicRSA';
+import {generateDeterministicRSAKeyPair} from '../utils/crypto/DeterministicRSA';
 
-import {setItem, getItem} from '../utils/AsyncStorage';
-import {Generator} from '../utils/Fuzzy Extractor/FE_Generator';
+import {setItem, getItem} from '../utils/storage/AsyncStorage';
+import {Generator} from '../utils/crypto/FE_Generator';
 
 /**
  * Face Embedding API

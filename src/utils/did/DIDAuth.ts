@@ -4,7 +4,7 @@ import bs58 from 'bs58';
 import * as ed2curve from 'ed2curve';
 import {Buffer} from 'buffer';
 import {ISSUER_INNER_PRIVATE_X25519_KEY, MEDIATOR_URL} from '@env';
-import {getItem} from '../utils/AsyncStorage';
+import {getItem} from '../storage/AsyncStorage';
 import {ISSUER_BACKEND_URL, ISSUER_INNER_PUBLIC_X25519_KEY} from '@env';
 
 // 25.03.05 Mediator에 토큰 등록

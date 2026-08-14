@@ -37,51 +37,103 @@ export default function HomeScreen() {
     }
   }, [targetUrl]);
 
+  // 26.08.14 fetchVcData 수정
   const fetchVcData = async (url: string) => {
-    try {
-      setLoading(true);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP 에러: ${response.status}`);
+  try {
+    setLoading(true);
 
-      const vcData = await response.json();
+    const response = await fetch(url);
+    const result = await response.json();
 
-      if (vcData) {
-        addVc(vcData);
-
-        // 발급된 VC의 DID와 일치하는 기존 DID 객체를 목록에서 찾음
-        const matchedDid = didList.find(
-          item => item.did === vcData?.credentialSubject?.id,
-        );
-
-        if (matchedDid) {
-          setSelectedDid(matchedDid); // ⭕️ 전체 DidData 객체 전달
-        } else if (vcData?.credentialSubject?.id) {
-          // didList에 없을 경우 DidData 타입 필수 필드를 채워서 전달
-          setSelectedDid({
-            did: vcData.credentialSubject.id,
-            alias: selectedDid?.alias || 'DID',
-            edVerkey: '',
-            edSecretkey: '',
-            xVerkey: '',
-            xSecretkey: '',
-            createdAt: Date.now(),
-          });
-        }
-
-        Alert.alert('발급 완료', '새로운 VC 티켓이 정상적으로 발급되었습니다.');
-      }
-    } catch (error) {
-      console.error('❌ VC 데이터 수신 실패:', error);
-      Alert.alert('발급 오류', 'VC 데이터를 불러오는 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
+    // HTTP 오류 + 서버가 body 안에 넣어 보내는 오류 모두 확인
+    if (
+      !response.ok ||
+      (typeof result?.status === 'number' && result.status >= 400)
+    ) {
+      throw new Error(
+        result?.message ||
+          result?.error ||
+          `HTTP 에러: ${response.status}`,
+      );
     }
-  };
 
+    // 현재 Issuer 서버는 { message, vc } 형태로 반환
+    // 혹시 VC 자체를 직접 반환하는 경우도 대응
+    const vc = result?.vc ?? result;
+
+    const subject =
+      vc?.credentialSubject ??
+      vc?.credential?.credentialSubject;
+
+    if (!subject?.id) {
+      throw new Error(
+        'VC에 credentialSubject.id가 없습니다.',
+      );
+    }
+
+    if (!subject?.ticketNumber) {
+      throw new Error(
+        'VC에 ticketNumber가 없습니다.',
+      );
+    }
+
+    // 발급된 VC 소유 DID가 실제 Wallet에 존재하는지 확인
+    const matchedDid = didList.find(
+      item => item.did === subject.id,
+    );
+
+    if (!matchedDid) {
+      throw new Error(
+        '발급된 VC의 DID가 Wallet에 존재하지 않습니다.',
+      );
+    }
+
+    // 실제 VC만 저장
+    addVc(vc);
+
+    // 필요하면 해당 DID를 현재 선택 DID로 변경
+    if (selectedDid?.did !== matchedDid.did) {
+      setSelectedDid(matchedDid);
+    }
+
+    console.log(
+      '✅ VC 발급 완료:',
+      subject.ticketNumber,
+    );
+
+    Alert.alert(
+      '발급 완료',
+      '새로운 VC 티켓이 정상적으로 발급되었습니다.',
+    );
+  } catch (error: any) {
+    console.error(
+      '❌ VC 데이터 수신 실패:',
+      error,
+    );
+
+    Alert.alert(
+      '발급 오류',
+      error?.message ||
+        'VC 데이터를 불러오는 중 오류가 발생했습니다.',
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // 26.08.14 수정
   // 2. 💡 선택된 DID의 did 값과 일치하는 VC 티켓만 필터링
-  const filteredVcList = vcList.filter(
-    vc => vc?.credentialSubject?.id === selectedDid?.did,
-  );
+  const filteredVcList = vcList.filter(vc => {
+    if (!vc) {
+      return false;
+    }
+
+    const subject =
+      vc?.credentialSubject ??
+      vc?.credential?.credentialSubject;
+
+    return subject?.id === selectedDid?.did;
+  });
 
   // 티켓 삭제
   const handleDeleteTicket = (ticketNumber: string) => {

@@ -225,20 +225,72 @@ async function copyGenesisFileToAppStorage(): Promise<string> {
   return destPath;
 }
 
+// 26.08.14 수정
 // Indy Pool 인스턴스 생성 함수
 export async function setupIndyPool(): Promise<PoolCreate | null> {
   try {
-    const genesisFilePath = await copyGenesisFileToAppStorage();
-    const genesisData = await RNFS.readFile(genesisFilePath, 'utf8');
+    console.log('🌐 [Indy] Pool 생성 시작');
+
+    const genesisData = await loadGenesisData();
+
+    if (!genesisData.trim()) {
+      throw new Error(
+        'genesis.txn 파일 내용이 비어 있습니다.',
+      );
+    }
 
     const pool = new PoolCreate({
       parameters: {
         transactions: genesisData,
       },
     });
+
+    console.log('✅ [Indy] Pool 생성 완료');
+
     return pool;
   } catch (error) {
-    console.error('❌ Indy Pool 생성 실패:', error);
+    console.error(
+      '❌ Indy Pool 생성 실패:',
+      error,
+    );
+
     return null;
   }
+}
+
+
+// 26.08.14 안드로이드, IOS용 파일 읽기
+async function loadGenesisData(): Promise<string> {
+  if (Platform.OS === 'android') {
+    console.log('🤖 [Indy] Android genesis.txn 로드');
+
+    const genesisData = await RNFS.readFileAssets(
+      'genesis 3.txn',
+      'utf8',
+    );
+
+    console.log(
+      '✅ [Indy] Android genesis.txn 로드 완료',
+      `(${genesisData.length} chars)`,
+    );
+
+    return genesisData;
+  }
+
+  console.log('🍎 [Indy] iOS genesis.txn 로드');
+
+  const genesisFilePath =
+    await copyGenesisFileToAppStorage();
+
+  const genesisData = await RNFS.readFile(
+    genesisFilePath,
+    'utf8',
+  );
+
+  console.log(
+    '✅ [Indy] iOS genesis.txn 로드 완료',
+    `(${genesisData.length} chars)`,
+  );
+
+  return genesisData;
 }

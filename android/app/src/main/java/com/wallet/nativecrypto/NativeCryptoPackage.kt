@@ -11,7 +11,8 @@ class NativeCryptoPackage : ReactPackage {
         reactContext: ReactApplicationContext
     ): List<NativeModule> {
         return listOf(
-            BCHModule(reactContext)
+            BCHModule(reactContext),
+            DeterministicRSAModule(reactContext)
         )
     }
 

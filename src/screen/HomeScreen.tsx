@@ -29,6 +29,7 @@ export default function HomeScreen() {
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
+
   // 1. FCM targetUrl 수신 시 VC 발급 처리
   useEffect(() => {
     if (targetUrl) {

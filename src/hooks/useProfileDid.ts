@@ -205,7 +205,7 @@ const sleep = (ms: number) =>
  * Galaxy Tab 실기기에서 생체 DID를 테스트하기 시작하면
  * false로 변경하면 된다.
  */
-const SKIP_FACE_ON_ANDROID_EMULATOR = true;
+const SKIP_FACE_ON_ANDROID_EMULATOR = false;
 
 export const useProfileDid = () => {
   const navigation = useNavigation<any>();

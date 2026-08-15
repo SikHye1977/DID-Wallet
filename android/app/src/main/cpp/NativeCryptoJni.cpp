@@ -6,8 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "BCH/BCH.hpp"
+#include <mutex>
 
+#include "BCH/BCH.hpp"
+#include "RSA/DeterministicRSA.hpp"
+
+static std::mutex g_rsaMutex;
 
 static std::string jstringToString(
     JNIEnv* env,
@@ -259,6 +263,127 @@ Java_com_wallet_nativecrypto_BCHModule_nativeRecover(
         return env->NewStringUTF(
             recoveredHex.c_str()
         );
+
+    } catch (const std::exception& e) {
+        throwJavaException(
+            env,
+            e.what()
+        );
+
+        return nullptr;
+    }
+}
+
+/**
+ * Kotlin:
+ *
+ * DeterministicRSAModule.nativeGeneratePublicKey(seedHex)
+ *
+ * 반환:
+ *   [0] publicKeyPem
+ *   [1] fingerprintHex
+ */
+extern "C"
+JNIEXPORT jobjectArray JNICALL
+Java_com_wallet_nativecrypto_DeterministicRSAModule_nativeGeneratePublicKey(
+    JNIEnv* env,
+    jobject,
+    jstring seedHex
+) {
+    try {
+        const std::string seed =
+            jstringToString(
+                env,
+                seedHex
+            );
+
+        if (seed.length() != 64) {
+            throw std::runtime_error(
+                "RSA Seed는 64자리의 256-bit Hex 문자열이어야 합니다."
+            );
+        }
+
+        DeterministicRSAResult result;
+
+        {
+            std::lock_guard<std::mutex> lock(
+                g_rsaMutex
+            );
+
+            result =
+                generateDeterministicRSA(
+                    seed
+                );
+        }
+
+        jclass stringClass =
+            env->FindClass(
+                "java/lang/String"
+            );
+
+        if (stringClass == nullptr) {
+            throw std::runtime_error(
+                "JNI String 클래스를 찾을 수 없습니다."
+            );
+        }
+
+        jobjectArray output =
+            env->NewObjectArray(
+                2,
+                stringClass,
+                nullptr
+            );
+
+        if (output == nullptr) {
+            throw std::runtime_error(
+                "JNI String 배열 생성에 실패했습니다."
+            );
+        }
+
+        jstring publicKey =
+            env->NewStringUTF(
+                result.publicKeyPem.c_str()
+            );
+
+        jstring fingerprint =
+            env->NewStringUTF(
+                result.fingerprintHex.c_str()
+            );
+
+        if (
+            publicKey == nullptr ||
+            fingerprint == nullptr
+        ) {
+            throw std::runtime_error(
+                "RSA 결과의 Java String 변환에 실패했습니다."
+            );
+        }
+
+        env->SetObjectArrayElement(
+            output,
+            0,
+            publicKey
+        );
+
+        env->SetObjectArrayElement(
+            output,
+            1,
+            fingerprint
+        );
+
+        env->DeleteLocalRef(
+            publicKey
+        );
+
+        env->DeleteLocalRef(
+            fingerprint
+        );
+
+        env->DeleteLocalRef(
+            stringClass
+        );
+
+        return output;
 
     } catch (const std::exception& e) {
         throwJavaException(

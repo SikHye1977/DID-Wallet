@@ -76,9 +76,12 @@ export default function TicketDetailScreen() {
     );
 
     // 기존 CameraScreen QR mode 사용
-    navigation.navigate('Camera', {
-      mode: 'QR',
-      vp,
+    navigation.navigate('MainTabs', {
+      screen: 'Camera',
+      params: {
+        mode: 'QR',
+        vp,
+      }
     });
   } catch (error) {
     console.error(

@@ -4,7 +4,7 @@ import * as nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import {Buffer} from 'buffer';
 
-const canonicalize = require('canonicalize') as (input: any) => string;
+import canonicalize from 'canonicalize';
 
 export interface DidDataForVP {
   did: string;

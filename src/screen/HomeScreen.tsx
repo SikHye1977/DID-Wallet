@@ -15,6 +15,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import VCcard from '../component/Ticket/VCcard';
 import {MainTabParamList} from '../types/navigation';
 import {useWalletStore} from '../store/useWalletStore';
+import { getVC } from '../utils/VCVP/getVC';
 
 type HomeScreenRouteProp = RouteProp<MainTabParamList, 'Home'>;
 
@@ -43,42 +44,14 @@ export default function HomeScreen() {
   try {
     setLoading(true);
 
-    const response = await fetch(url);
-    const result = await response.json();
-
-    // HTTP 오류 + 서버가 body 안에 넣어 보내는 오류 모두 확인
-    if (
-      !response.ok ||
-      (typeof result?.status === 'number' && result.status >= 400)
-    ) {
-      throw new Error(
-        result?.message ||
-          result?.error ||
-          `HTTP 에러: ${response.status}`,
-      );
-    }
-
-    // 현재 Issuer 서버는 { message, vc } 형태로 반환
-    // 혹시 VC 자체를 직접 반환하는 경우도 대응
-    const vc = result?.vc ?? result;
+    // utils에서 VC 조회 + 기본 형식 검증
+    const vc = await getVC(url);
 
     const subject =
       vc?.credentialSubject ??
       vc?.credential?.credentialSubject;
 
-    if (!subject?.id) {
-      throw new Error(
-        'VC에 credentialSubject.id가 없습니다.',
-      );
-    }
-
-    if (!subject?.ticketNumber) {
-      throw new Error(
-        'VC에 ticketNumber가 없습니다.',
-      );
-    }
-
-    // 발급된 VC 소유 DID가 실제 Wallet에 존재하는지 확인
+    // 해당 VC의 소유 DID가 Wallet에 존재하는지 검사
     const matchedDid = didList.find(
       item => item.did === subject.id,
     );
@@ -89,10 +62,10 @@ export default function HomeScreen() {
       );
     }
 
-    // 실제 VC만 저장
+    // Zustand에 VC 저장
     addVc(vc);
 
-    // 필요하면 해당 DID를 현재 선택 DID로 변경
+    // VC 소유 DID를 현재 선택
     if (selectedDid?.did !== matchedDid.did) {
       setSelectedDid(matchedDid);
     }

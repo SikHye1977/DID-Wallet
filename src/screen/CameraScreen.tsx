@@ -578,7 +578,7 @@ export default function CameraScreen() {
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={isFocused && !isProcessing}
+        isActive={isFocused}
         photo={!isQrMode}
         codeScanner={isQrMode ? codeScanner : undefined}
       />

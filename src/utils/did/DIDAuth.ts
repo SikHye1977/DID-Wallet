@@ -36,6 +36,22 @@ export async function get_challenge(
 
   const requestBody = {authRequestId, did, deviceToken};
 
+  // Andorid log
+  console.log('========== [DID Auth Challenge Request] ==========');
+  console.log('URL:', url);
+  console.log('authRequestId:', authRequestId);
+  console.log('did:', did);
+  console.log('deviceToken exists:', !!deviceToken);
+  console.log('deviceToken length:', deviceToken?.length);
+  console.log(
+    'deviceToken preview:',
+    deviceToken
+      ? `${deviceToken.slice(0, 10)}...${deviceToken.slice(-6)}`
+      : 'EMPTY',
+  );
+  console.log('==================================================');
+  // Android log 
+
   try {
     const response = await axios.post(url, requestBody);
     console.log(deviceToken);
@@ -182,3 +198,4 @@ export async function verify_challenge(
     return false;
   }
 }
+

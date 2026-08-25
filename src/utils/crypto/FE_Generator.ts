@@ -50,6 +50,21 @@ export async function Generator(faceBinaryString: string) {
 }
 
 export async function Secure_Sketch(w_hex: string): Promise<string> {
+  // android log
+  console.log(
+    '[BCH NativeModule Check]',
+    BCHModule,
+  );
+
+  if (
+    !BCHModule ||
+    typeof BCHModule.generateSyndrome !== 'function'
+  ) {
+    throw new Error(
+      'BCHModule이 Android NativeModule에 연결되지 않았습니다.',
+    );
+  }
+  // android log
   return await BCHModule.generateSyndrome(w_hex);
 }
 

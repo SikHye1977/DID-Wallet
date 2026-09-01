@@ -67,14 +67,24 @@ const VCcard = ({vc, index, isDeleteMode = false, onDeletePress}: VCProps) => {
         {/* 정보 그리드 */}
         <View style={styles.infoRow}>
           <View style={styles.infoCol}>
-            <Text style={styles.label}>HOLDER (소유자)</Text>
-            <Text style={styles.value} numberOfLines={1}>
+            <Text style={styles.label} numberOfLines={1}>
+              HOLDER (소유자)
+            </Text>
+
+            <Text style={styles.value} numberOfLines={1} ellipsizeMode="middle">
               {ownerLabel}
             </Text>
           </View>
+
           <View style={styles.infoColRight}>
-            <Text style={styles.label}>TICKET NO.</Text>
-            <Text style={styles.valueHighlight} numberOfLines={1}>
+            <Text style={[styles.label, styles.rightText]} numberOfLines={1}>
+              TICKET NO.
+            </Text>
+
+            <Text
+              style={[styles.valueHighlight, styles.rightText]}
+              numberOfLines={1}
+              ellipsizeMode="middle">
               {ticketNumber || '-'}
             </Text>
           </View>
@@ -163,15 +173,22 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
+    gap: 16,
   },
+
   infoCol: {
     flex: 1,
+    minWidth: 0,
   },
+
   infoColRight: {
+    flex: 1.7,
+    minWidth: 0,
     alignItems: 'flex-end',
   },
+
   label: {
     fontSize: 10,
     color: '#94a3b8',
@@ -179,15 +196,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 2,
   },
+
   value: {
     fontSize: 14,
     color: '#f1f5f9',
     fontWeight: '600',
+    width: '100%',
+    flexShrink: 1,
   },
+
   valueHighlight: {
     fontSize: 14,
     color: '#38bdf8',
     fontWeight: '700',
+    width: '100%',
+    flexShrink: 1,
+  },
+
+  rightText: {
+    textAlign: 'right',
   },
   dividerContainer: {
     flexDirection: 'row',

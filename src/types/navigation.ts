@@ -15,6 +15,10 @@ export type RootStackParamList = {
   Auth: {authRequestId?: string} | undefined;
   Test: undefined;
   TicketDetail: {vc: any};
+  Verify: {
+    vc: any;
+    requestUri: string;
+  };
 };
 
 // 3. Navigation Prop 타입

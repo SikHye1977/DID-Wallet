@@ -10,6 +10,7 @@ import CameraScreen from '../screen/CameraScreen';
 import TestRegisterScreen from '../screen/TestRegisterScreen';
 import AuthScreen from '../screen/AuthScreen';
 import TicketDetailScreen from '../screen/TicketDetailScreen';
+import VerifyScreen from '../screen/VerifyScreen';
 
 import {RootStackParamList, MainTabParamList} from '../types/navigation';
 
@@ -94,6 +95,7 @@ export default function RootNavigator() {
         component={TicketDetailScreen}
         options={{headerShown: false}}
       />
+      <Stack.Screen name="Verify" component={VerifyScreen} />
     </Stack.Navigator>
   );
 }

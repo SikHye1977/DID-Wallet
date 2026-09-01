@@ -65,7 +65,7 @@ type PendingDidKeys = {
 type CameraRouteParams = {
   mode?: CameraMode;
   pendingDidKeys?: PendingDidKeys;
-  vp?: unknown;
+  vc?: unknown;
 };
 
 /**
@@ -240,7 +240,7 @@ export default function CameraScreen() {
 
   const mode: CameraMode = routeParams.mode ?? 'QR';
   const pendingDidKeys = routeParams.pendingDidKeys;
-  const vp = routeParams.vp;
+  const vc = routeParams.vc;
 
   const isQrMode = mode === 'QR';
   const cameraPosition = isQrMode ? 'back' : 'front';
@@ -334,11 +334,15 @@ export default function CameraScreen() {
 
       if (path === 'verify') {
         if (params.request_uri) {
-          console.log('Verify DeepLink 감지:', params.request_uri);
-          navigation.replace('Verify', {
-            vp,
-            requestUri: params.request_uri,
+          const requestUri = params.request_uri;
+
+          console.log('🔍 [Verifier QR] request_uri 감지:', requestUri);
+
+          navigation.navigate('Verify', {
+            vc,
+            requestUri,
           });
+
           return true;
         }
       }
@@ -376,8 +380,8 @@ export default function CameraScreen() {
           if (match?.[1]) {
             const requestUri = decodeURIComponent(match[1]);
 
-            navigation.replace('Verify', {
-              vp,
+            navigation.navigate('Verify', {
+              vc,
               requestUri,
             });
             return;

@@ -11,8 +11,7 @@ import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-import { useWalletStore } from '../store/useWalletStore';
-import { createVP } from '../utils/VCVP/createVP';
+import {useWalletStore} from '../store/useWalletStore';
 
 type RootStackParamList = {
   TicketDetail: {vc: any};
@@ -28,75 +27,64 @@ export default function TicketDetailScreen() {
 
   // 26.08.18 추가
   // VP검증을 위해
-  const selectedDid =
-  useWalletStore(
-    state => state.selectedDid,
-  );
-  // 26.08.18 추가
-  // VP검증을 위해
-  const openCameraComponent = async () => {
-  try {
-    if (!selectedDid) {
-      Alert.alert(
-        'DID 오류',
-        '티켓 검증에 사용할 DID가 선택되지 않았습니다.',
-      );
-      return;
-    }
+  const selectedDid = useWalletStore(state => state.selectedDid);
 
-    if (!vc) {
-      Alert.alert(
-        '티켓 오류',
-        '검증할 VC가 없습니다.',
-      );
-      return;
-    }
-
-    // 현재 VC의 소유 DID 확인
-    const subject =
-      vc?.credentialSubject ??
-      vc?.credential?.credentialSubject;
-
-    if (!subject?.id) {
-      throw new Error(
-        'VC에 credentialSubject.id가 없습니다.',
-      );
-    }
-
-    if (subject.id !== selectedDid.did) {
-      throw new Error(
-        '현재 선택된 DID와 티켓의 소유 DID가 일치하지 않습니다.',
-      );
-    }
-
-    // VP 생성
-    const vp = await createVP(
-      vc,
-      selectedDid,
-    );
-
-    // 기존 CameraScreen QR mode 사용
-    navigation.navigate('MainTabs', {
-      screen: 'Camera',
-      params: {
-        mode: 'QR',
-        vp,
+  // 26.08.26 수정
+  // VP 만들지 않고 VC만 넘기게 수정
+  const openCameraComponent = () => {
+    try {
+      // 1. 현재 선택된 DID 확인
+      if (!selectedDid) {
+        Alert.alert(
+          'DID 오류',
+          '티켓 검증에 사용할 DID가 선택되지 않았습니다.',
+        );
+        return;
       }
-    });
-  } catch (error) {
-    console.error(
-      '❌ VP 생성 실패:',
-      error,
-    );
 
-    Alert.alert(
-      'VP 생성 실패',
-      error instanceof Error
-        ? error.message
-        : '티켓 검증용 VP를 생성하지 못했습니다.',
-    );
-  }
-};
+      // 2. 검증할 VC 존재 확인
+      if (!vc) {
+        Alert.alert('티켓 오류', '검증할 VC가 없습니다.');
+        return;
+      }
+
+      // 3. VC의 credentialSubject 확인
+      const vcSubject =
+        vc?.credentialSubject ?? vc?.credential?.credentialSubject;
+
+      if (!vcSubject?.id) {
+        throw new Error('VC에 credentialSubject.id가 없습니다.');
+      }
+
+      if (!vcSubject?.ticketNumber) {
+        throw new Error('VC에 credentialSubject.ticketNumber가 없습니다.');
+      }
+
+      // 4. 현재 선택된 DID가 이 티켓의 Holder인지 확인
+      if (vcSubject.id !== selectedDid.did) {
+        throw new Error(
+          '현재 선택된 DID와 티켓의 소유 DID가 일치하지 않습니다.',
+        );
+      }
+
+      navigation.navigate('MainTabs', {
+        screen: 'Camera',
+        params: {
+          mode: 'QR',
+          vc,
+        },
+      });
+    } catch (error) {
+      console.error('❌ 티켓 검증 준비 실패:', error);
+
+      Alert.alert(
+        '검증 준비 실패',
+        error instanceof Error
+          ? error.message
+          : '티켓 검증을 시작할 수 없습니다.',
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>

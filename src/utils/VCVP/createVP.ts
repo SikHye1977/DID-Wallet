@@ -27,13 +27,9 @@ export interface VerifiablePresentation {
   };
 }
 
-function base64UrlEncode(
-  input: string | Uint8Array,
-): string {
+function base64UrlEncode(input: string | Uint8Array): string {
   const buffer =
-    typeof input === 'string'
-      ? Buffer.from(input, 'utf8')
-      : Buffer.from(input);
+    typeof input === 'string' ? Buffer.from(input, 'utf8') : Buffer.from(input);
 
   return buffer
     .toString('base64')
@@ -59,9 +55,7 @@ export async function createVP(
   }
 
   if (!didData?.edSecretkey) {
-    throw new Error(
-      'VP 서명에 사용할 Ed25519 비밀키가 없습니다.',
-    );
+    throw new Error('VP 서명에 사용할 Ed25519 비밀키가 없습니다.');
   }
 
   const holderDid = didData.did.startsWith('did:')
@@ -75,7 +69,7 @@ export async function createVP(
   const vp: VerifiablePresentation = {
     '@context': [
       'https://www.w3.org/ns/credentials/v2',
-      'https://example.org/context/v1/ticket-schema.json',
+      // 'https://example.org/context/v1/ticket-schema.json',
     ],
 
     type: ['VerifiablePresentation'],
@@ -95,21 +89,17 @@ export async function createVP(
 
   delete vpToSign.proof;
 
-  const canonicalizedPayload =
-    canonicalize(vpToSign);
+  const canonicalizedPayload = canonicalize(vpToSign);
 
   if (!canonicalizedPayload) {
-    throw new Error(
-      'VP Canonicalization에 실패했습니다.',
-    );
+    throw new Error('VP Canonicalization에 실패했습니다.');
   }
 
   // ---------------------------------------------------------
   // 3. Ed25519 Private Key
   // ---------------------------------------------------------
 
-  const privateKey =
-    bs58.decode(didData.edSecretkey);
+  const privateKey = bs58.decode(didData.edSecretkey);
 
   if (privateKey.length !== nacl.sign.secretKeyLength) {
     throw new Error(
@@ -127,33 +117,21 @@ export async function createVP(
     crit: ['b64'],
   };
 
-  const encodedHeader =
-    base64UrlEncode(
-      JSON.stringify(header),
-    );
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
 
-  const encodedPayload =
-    base64UrlEncode(
-      canonicalizedPayload,
-    );
+  const encodedPayload = base64UrlEncode(canonicalizedPayload);
 
-  const signingInput =
-    new TextEncoder().encode(
-      `${encodedHeader}.${encodedPayload}`,
-    );
+  const signingInput = new TextEncoder().encode(
+    `${encodedHeader}.${encodedPayload}`,
+  );
 
   // ---------------------------------------------------------
   // 5. Ed25519 Detached Signature
   // ---------------------------------------------------------
 
-  const signature =
-    nacl.sign.detached(
-      signingInput,
-      privateKey,
-    );
+  const signature = nacl.sign.detached(signingInput, privateKey);
 
-  const encodedSignature =
-    base64UrlEncode(signature);
+  const encodedSignature = base64UrlEncode(signature);
 
   // ---------------------------------------------------------
   // 6. Proof 생성
@@ -164,19 +142,16 @@ export async function createVP(
 
     created: new Date().toISOString(),
 
-    verificationMethod:
-      `${holderDid}#key-1`,
+    verificationMethod: `${holderDid}#key-1`,
 
     proofPurpose: 'authentication',
 
-    jws:
-      `${encodedHeader}..${encodedSignature}`,
+    jws: `${encodedHeader}..${encodedSignature}`,
   };
 
   console.log('✅ VP 생성 완료', {
     holder: vp.holder,
-    vcCount:
-      vp.verifiableCredential.length,
+    vcCount: vp.verifiableCredential.length,
     proofType: vp.proof.type,
   });
 

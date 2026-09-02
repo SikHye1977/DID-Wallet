@@ -5,7 +5,11 @@ import * as ed2curve from 'ed2curve';
 import {Buffer} from 'buffer';
 import {ISSUER_INNER_PRIVATE_X25519_KEY, MEDIATOR_URL} from '@env';
 import {getItem} from '../storage/AsyncStorage';
-import {ISSUER_BACKEND_URL, ISSUER_INNER_PUBLIC_X25519_KEY} from '@env';
+import {
+  ISSUER_BACKEND_URL,
+  ISSUER_INNER_PUBLIC_X25519_KEY,
+  VERIFIER_X25519_PUBLIC_KEY,
+} from '@env';
 
 // 25.03.05 Mediator에 토큰 등록
 export async function regist_token(did: string, token: string) {
@@ -50,7 +54,7 @@ export async function get_challenge(
       : 'EMPTY',
   );
   console.log('==================================================');
-  // Android log 
+  // Android log
 
   try {
     const response = await axios.post(url, requestBody);
@@ -71,6 +75,95 @@ export async function get_challenge(
     } else {
       console.error('Challenge 생성 중 알 수 없는 오류 발생:', error.message);
     }
+    return null;
+  }
+}
+
+// 26.09.01
+// Verifier Challenge 복호화
+export async function decrypt_verifier_challenge(
+  encryptedChallengeBase58: string,
+  holderXSecretKey: string,
+): Promise<string | null> {
+  try {
+    if (!encryptedChallengeBase58) {
+      throw new Error('Verifier Challenge가 없습니다.');
+    }
+
+    if (!holderXSecretKey) {
+      throw new Error('Holder X25519 Private Key가 없습니다.');
+    }
+
+    if (!VERIFIER_X25519_PUBLIC_KEY) {
+      throw new Error('Verifier X25519 Public Key가 없습니다.');
+    }
+
+    // Holder X25519 Private Key
+    const holderXPrivateKey = bs58.decode(holderXSecretKey);
+
+    if (holderXPrivateKey.length !== 32) {
+      throw new Error(
+        `Invalid Holder X25519 Private Key Length: ${holderXPrivateKey.length}`,
+      );
+    }
+
+    // Verifier X25519 Public Key
+    const verifierXPublicKey = bs58.decode(
+      VERIFIER_X25519_PUBLIC_KEY,
+    );
+
+    if (verifierXPublicKey.length !== 32) {
+      throw new Error(
+        `Invalid Verifier X25519 Public Key Length: ${verifierXPublicKey.length}`,
+      );
+    }
+
+    // challenge = Base58(nonce || ciphertext)
+    const combinedData = bs58.decode(
+      encryptedChallengeBase58,
+    );
+
+    if (combinedData.length <= 24) {
+      throw new Error(
+        'Encrypted Verifier Challenge 데이터 길이가 올바르지 않습니다.',
+      );
+    }
+
+    // TweetNaCl box nonce = 24 bytes
+    const nonce = combinedData.slice(0, 24);
+
+    // 나머지는 ciphertext
+    const encryptedChallenge =
+      combinedData.slice(24);
+
+    const decryptedChallenge = nacl.box.open(
+      encryptedChallenge,
+      nonce,
+      verifierXPublicKey,
+      holderXPrivateKey,
+    );
+
+    if (!decryptedChallenge) {
+      throw new Error(
+        'Verifier Challenge 복호화에 실패했습니다.',
+      );
+    }
+
+    // 명세에서 요구하는 Base58 형태로 반환
+    const decryptedChallengeBase58 =
+      bs58.encode(decryptedChallenge);
+
+    console.log(
+      '✅ [Verifier DID-Auth] Challenge 복호화 성공',
+    );
+
+    return decryptedChallengeBase58;
+  } catch (error) {
+    console.error(
+      '❌ [Verifier DID-Auth] Challenge 복호화 실패:',
+      error,
+    );
+
     return null;
   }
 }
@@ -198,4 +291,3 @@ export async function verify_challenge(
     return false;
   }
 }
-

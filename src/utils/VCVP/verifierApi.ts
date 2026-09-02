@@ -1,5 +1,3 @@
-// src/utils/VCVP/verifierApi.ts
-
 export interface RequestObjectBody {
   ticketNumber: string;
   primaryPurchaserDid: string;
@@ -19,6 +17,16 @@ export interface PresentationResponse {
   DIDAuthURL?: string;
 }
 
+export interface HolderAuthRequest {
+  decrypted_challenge: string;
+  holder_did: string;
+}
+
+export interface HolderAuthResponse {
+  requestId: string;
+  result: boolean;
+}
+
 async function parseJsonResponse(response: Response): Promise<any> {
   const responseText = await response.text();
 
@@ -34,7 +42,7 @@ async function parseJsonResponse(response: Response): Promise<any> {
 /**
  * STEP 1
  *
- * QR에서 얻은 request_uri에
+ * QR에서 받은 request_uri에
  * ticketNumber / primaryPurchaserDid / holderDid 전송
  */
 export async function requestVerificationObject(
@@ -73,7 +81,7 @@ export async function requestVerificationObject(
 /**
  * STEP 2
  *
- * 생성된 VP를 Verifier에 제출
+ * 생성한 VP를 Verifier에 제출
  */
 export async function submitPresentation(
   presentationSubmissionURL: string,
@@ -90,8 +98,25 @@ export async function submitPresentation(
     }),
   });
 
-  const result = await parseJsonResponse(response);
+  console.log('========== [VP Submission Request] ==========');
+  console.log('URL:', presentationSubmissionURL);
+  console.log('VP type:', vp?.type);
+  console.log('VP holder:', vp?.holder);
+  console.log(
+    'VC count:',
+    Array.isArray(vp?.verifiableCredential)
+      ? vp.verifiableCredential.length
+      : 0,
+  );
+  console.log('VP proof type:', vp?.proof?.type);
+  console.log('=============================================');
 
+  const result = await parseJsonResponse(response);
+  console.log('========== [VP Submission Response] ==========');
+  console.log('HTTP Status:', response.status);
+  console.log('Response OK:', response.ok);
+  console.log('Response Body:', result);
+  console.log('==============================================');
   if (!response.ok) {
     throw new Error(
       result?.message ??
@@ -105,4 +130,42 @@ export async function submitPresentation(
   }
 
   return result;
+}
+
+/**
+ * STEP 3
+ *
+ * VP 검증 성공 후 Challenge 복호화 결과를
+ * Verifier가 전달한 DIDAuthURL로 전송
+ */
+export async function submitHolderAuth(
+  didAuthURL: string,
+  body: HolderAuthRequest,
+): Promise<HolderAuthResponse> {
+  const response = await fetch(didAuthURL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const result = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      result?.message ??
+        result?.error ??
+        `Holder DID-Auth 요청 실패: HTTP ${response.status}`,
+    );
+  }
+
+  if (typeof result?.result !== 'boolean') {
+    throw new Error('Verifier Holder DID-Auth 응답에 result 값이 없습니다.');
+  }
+
+  return {
+    requestId: result.requestId,
+    result: result.result,
+  };
 }

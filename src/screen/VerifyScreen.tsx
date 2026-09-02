@@ -21,7 +21,10 @@ import {createVP} from '../utils/VCVP/createVP';
 import {
   requestVerificationObject,
   submitPresentation,
+  submitHolderAuth,
 } from '../utils/VCVP/verifierApi';
+
+import {decrypt_verifier_challenge} from '../utils/did/DIDAuth';
 
 type VerifyRouteParams = {
   vc: any;
@@ -35,6 +38,9 @@ type VerificationStatus =
   | 'VP_GENERATION'
   | 'VP_SUBMISSION'
   | 'VP_VERIFIED'
+  | 'DID_AUTH_DECRYPTING'
+  | 'DID_AUTH_SUBMITTING'
+  | 'DID_AUTH_SUCCESS'
   | 'FAILED';
 
 function toFullDid(did: string): string {
@@ -209,16 +215,80 @@ export default function VerifyScreen() {
       }
 
       console.log('✅ [Verifier] VP 검증 성공');
-
       console.log(' - requestId:', presentationResult.requestId);
 
-      console.log(' - challenge exists:', !!presentationResult.challenge);
-
-      console.log(' - DIDAuthURL exists:', !!presentationResult.DIDAuthURL);
+      // =====================================================
+      // 7. Holder DID-Auth 정보 확인
+      // =====================================================
 
       setStatus('VP_VERIFIED');
+      setStatusText('VP 검증에 성공했습니다. Holder DID 인증을 준비합니다.');
 
-      setStatusText('VP 검증에 성공했습니다. Holder 인증을 준비합니다.');
+      if (!presentationResult.challenge) {
+        throw new Error(
+          'Verifier 응답에 Holder DID-Auth Challenge가 없습니다.',
+        );
+      }
+
+      if (!presentationResult.DIDAuthURL) {
+        throw new Error('Verifier 응답에 DIDAuthURL이 없습니다.');
+      }
+
+      // =====================================================
+      // 8. Verifier Challenge 복호화
+      // =====================================================
+
+      setStatus('DID_AUTH_DECRYPTING');
+
+      setStatusText('Holder DID 인증 Challenge를 복호화하고 있습니다.');
+
+      const decryptedChallenge = await decrypt_verifier_challenge(
+        presentationResult.challenge,
+        selectedDid.xSecretkey,
+      );
+
+      if (!decryptedChallenge) {
+        throw new Error('Verifier Challenge 복호화에 실패했습니다.');
+      }
+
+      console.log('✅ [Verifier DID-Auth] Challenge 복호화 완료');
+
+      // =====================================================
+      // 9. Holder DID-Auth 응답 전송
+      // =====================================================
+
+      setStatus('DID_AUTH_SUBMITTING');
+
+      setStatusText('Verifier에 Holder DID 인증 결과를 전송하고 있습니다.');
+
+      const holderAuthResult = await submitHolderAuth(
+        presentationResult.DIDAuthURL,
+        {
+          decrypted_challenge: decryptedChallenge,
+
+          holder_did: holderDid,
+        },
+      );
+
+      console.log('✅ [Verifier DID-Auth] 응답 수신');
+
+      console.log(' - requestId:', holderAuthResult.requestId);
+
+      console.log(' - result:', holderAuthResult.result);
+
+      // =====================================================
+      // 10. Holder DID-Auth 결과 확인
+      // =====================================================
+
+      if (!holderAuthResult.result) {
+        throw new Error('Verifier가 Holder DID 인증을 실패로 판정했습니다.');
+      }
+
+      setStatus('DID_AUTH_SUCCESS');
+
+      setStatusText('VP 검증과 Holder DID 인증이 완료되었습니다.');
+
+      console.log('✅ [Verifier] VP + Holder DID-Auth 성공');
     } catch (error) {
       console.error('❌ [VP Verify] 검증 실패:', error);
 
@@ -239,7 +309,7 @@ export default function VerifyScreen() {
     startVerification();
   }, [startVerification]);
 
-  const isLoading = status !== 'VP_VERIFIED' && status !== 'FAILED';
+  const isLoading = status !== 'DID_AUTH_SUCCESS' && status !== 'FAILED';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -268,19 +338,19 @@ export default function VerifyScreen() {
           </>
         )}
 
-        {status === 'VP_VERIFIED' && (
+        {status === 'DID_AUTH_SUCCESS' && (
           <>
             <View style={styles.successIcon}>
               <Ionicons name="checkmark" size={42} color="#ffffff" />
             </View>
 
-            <Text style={styles.statusTitle}>VP 검증 성공</Text>
+            <Text style={styles.statusTitle}>Holder 인증 성공</Text>
 
             <Text style={styles.statusText}>{statusText}</Text>
 
             <Text style={styles.description}>
-              Verifiable Presentation의 유효성 검증이 완료되었습니다. 다음
-              단계에서 Holder DID 인증을 진행합니다.
+              Verifiable Presentation 검증과 Holder DID 인증이 정상적으로
+              완료되었습니다.
             </Text>
           </>
         )}
